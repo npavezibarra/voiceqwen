@@ -6,6 +6,8 @@ import torch
 import soundfile as sf
 import numpy as np
 import re
+import gc
+import time
 from qwen_tts import Qwen3TTSModel
 
 # --- CONFIGURACIÓN ---
@@ -36,7 +38,7 @@ def get_available_voices():
 
 VOICES = get_available_voices()
 
-def get_safe_chunks(text, max_words=45):
+def get_safe_chunks(text, max_words=25):
     sentences = re.split(r'(?<=[.!?]) +', text.replace('\n', ' '))
     chunks = []
     current_chunk = []
@@ -56,20 +58,36 @@ def get_safe_chunks(text, max_words=45):
         chunks.append(" ".join(current_chunk))
     return chunks
 
-def update_status(file_path, current, total, start_time):
+def update_status(file_path, **kwargs):
     if not file_path:
         return
     try:
-        data = {
-            "status": "processing",
-            "current": int(current),
-            "total": int(total),
-            "time": int(start_time)
-        }
+        data = kwargs
+        if "status" not in data:
+            data["status"] = "processing"
         with open(file_path, 'w') as f:
             json.dump(data, f)
     except:
         pass
+
+def take_a_breath(file_path, current, total, start_time, message="Resting / Cleaning RAM..."):
+    print(f"--- {message} ---", flush=True)
+    update_status(
+        file_path, 
+        current=current, 
+        total=total, 
+        time=start_time, 
+        stage="resting", 
+        message=message
+    )
+    
+    gc.collect()
+    if DEVICE == "mps":
+        torch.mps.empty_cache()
+    elif DEVICE == "cuda":
+        torch.cuda.empty_cache()
+    
+    time.sleep(1.5)
 
 def main():
     try:
@@ -90,7 +108,6 @@ def main():
             ref_text_content = f.read().strip()
 
         print(f"Cargando modelo en {DEVICE} (float32)...", flush=True)
-        # Matches original working code from Desktop
         tts = Qwen3TTSModel.from_pretrained(
             MODEL_NAME, 
             device_map=DEVICE, 
@@ -102,7 +119,6 @@ def main():
         total_chunks = len(chunks)
         print(f"Dividido en {total_chunks} fragmentos.", flush=True)
         
-        # Get start time from existing status file if possible
         start_time = 0
         if args.status_file and os.path.exists(args.status_file):
             try:
@@ -116,8 +132,17 @@ def main():
 
         for i, chunk in enumerate(chunks):
             current_num = i + 1
-            print(f"Procesando fragmento {current_num}/{total_chunks}...", flush=True)
-            update_status(args.status_file, current_num, total_chunks, start_time)
+            msg = f"Generando fragmento {current_num}/{total_chunks}"
+            print(f"Procesando {msg}...", flush=True)
+            update_status(
+                args.status_file, 
+                current=current_num, 
+                total=total_chunks, 
+                stage="generating",
+                message=msg,
+                time=start_time
+            )
+
             wavs, _ = tts.generate_voice_clone(
                 text=chunk,
                 ref_audio=[voice_config["audio"]],
@@ -129,27 +154,31 @@ def main():
             )
             all_audios.append(wavs[0])
             
-            # Silence
             pause = np.zeros(int(SR * 1.2))
             all_audios.append(pause)
+            
+            take_a_breath(args.status_file, current_num, total_chunks, start_time)
 
         if all_audios:
             print("Concatenando y guardando...", flush=True)
+            update_status(
+                args.status_file,
+                current=total_chunks,
+                total=total_chunks,
+                stage="concatenating",
+                message="Saving final file...",
+                time=start_time
+            )
             final_wav = np.concatenate(all_audios)
             sf.write(args.output, final_wav, SR)
             
-            # Final status update
-            if args.status_file:
-                try:
-                    with open(args.status_file, 'w') as f:
-                        json.dump({
-                            "status": "completed", 
-                            "current": total_chunks, 
-                            "total": total_chunks, 
-                            "time": start_time
-                        }, f)
-                except:
-                    pass
+            update_status(
+                args.status_file, 
+                status="completed", 
+                current=total_chunks, 
+                total=total_chunks, 
+                time=start_time
+            )
                     
             print(f"DONE: {args.output}", flush=True)
             
@@ -161,3 +190,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+

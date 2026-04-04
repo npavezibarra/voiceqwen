@@ -95,16 +95,17 @@ jQuery(document).ready(function ($) {
             contentType: false,
             success: function (response) {
                 if (response.success && response.data.status === 'processing') {
-                    $status.show().text('Generando diálogo... ten paciencia, esto toma tiempo.').css('color', '#0000ff');
+                    $status.show().html('<div style="color:blue; font-weight:bold;">🚀 SE HA INICIADO LA GENERACIÓN...</div>').css('color', '#0000ff');
                     $('#reset-status-btn').removeClass('hidden');
                     startPolling();
                 } else {
-                    $status.text('Error: ' + response.data).css('color', 'red');
+                    const errorMsg = response.data || 'Error desconocido';
+                    $status.show().html(`<div style="border:2px solid red; background:white; padding:10px; color:red; font-weight:bold;">⚠️ ERROR: ${errorMsg}</div>`);
                     $btn.prop('disabled', false).text('Generar Diálogo');
                 }
             },
             error: function () {
-                $status.text('Error de red').css('color', 'red');
+                $status.show().html('<div style="color:red; font-weight:bold;">⚠️ Error de red o del servidor.</div>');
                 $btn.prop('disabled', false).text('Generar Diálogo');
             }
         });
@@ -289,19 +290,71 @@ jQuery(document).ready(function ($) {
                 const seconds = elapsed % 60;
                 
                 let progressStr = "";
-                if (details.current && details.total) {
+                let statusColor = "#0000ff";
+                let statusEmoji = "⚡";
+
+                if (details.stage === 'resting') {
+                    statusColor = "#00aa00";
+                    statusEmoji = "🧘";
+                    progressStr = `
+                        <div style="color:${statusColor}; font-weight:bold; font-size:1.1em; margin: 10px 0;">
+                            ${statusEmoji} SISTEMA DESCANSANDO / LIMPIANDO RAM...
+                        </div>
+                        <div style="font-size:0.9em; color:#666;">(Segmento ${details.current}/${details.total})</div>
+                    `;
+                } else if (details.stage === 'generating') {
+                    statusColor = "#ff00ff";
+                    statusEmoji = "🚀";
+                    let subInfo = "";
+                    if (details.sub_current && details.sub_total) {
+                        subInfo = `<br><small style="font-size:0.8em;">Fragmento interno ${details.sub_current} de ${details.sub_total}</small>`;
+                    }
+                    progressStr = `
+                        <div style="color:${statusColor}; font-weight:bold; font-size:1.1em; margin: 10px 0;">
+                            ${statusEmoji} PROCESANDO SEGMENTO ${details.current} DE ${details.total}...
+                            ${subInfo}
+                        </div>
+                    `;
+                } else if (details.stage === 'concatenating') {
+                    statusColor = "#ffaa00";
+                    statusEmoji = "📦";
+                    progressStr = `
+                        <div style="color:${statusColor}; font-weight:bold; font-size:1.1em; margin: 10px 0;">
+                            ${statusEmoji} CONCATENANDO Y GUARDANDO ARCHIVO...
+                        </div>
+                    `;
+                } else if (details.current && details.total) {
                     progressStr = `<div style="color:#ff00ff; font-weight:bold; font-size:1.1em; margin: 10px 0;">🚀 PROCESANDO SEGMENTO ${details.current} DE ${details.total}...</div>`;
                 }
 
                 let timeStr = `${minutes}m ${seconds}s`;
+                
+                // ETA Calculation
+                let etaStr = "";
+                const completedSegments = parseInt(details.current) - 1;
+                if (completedSegments > 0 && details.total) {
+                    const totalSegments = parseInt(details.total);
+                    const secondsPerSegment = elapsed / completedSegments;
+                    const remainingSegments = totalSegments - completedSegments;
+                    const etaSeconds = Math.floor(secondsPerSegment * remainingSegments);
+                    
+                    if (etaSeconds > 0) {
+                        const etaMins = Math.floor(etaSeconds / 60);
+                        const etaSecs = etaSeconds % 60;
+                        etaStr = `<div style="color:#000; font-weight:bold; margin-top:5px; background: rgba(0,0,0,0.05); padding: 5px; border-left: 3px solid #000;">🕒 Tiempo restante estimado: ${etaMins}m ${etaSecs}s</div>`;
+                    }
+                }
+
                 $status.show().html(`
-                    <div style="font-weight:bold; margin-bottom:5px; color:#0000ff;">
-                        ⚡ Generando con Qwen3-TTS 1.7B...
+                    <div style="font-weight:bold; margin-bottom:5px; color:${statusColor};">
+                        ${statusEmoji} Qwen3-TTS: ${details.message || 'Procesando...'}
                     </div>
                     ${progressStr}
-                    <div style="font-size:0.9em; color:#555;">
-                        Tiempo transcurrido: ${timeStr}<br>
-                        (El modelo es pesado, ten paciencia. El archivo aparecerá solo al finalizar).
+                    <div style="font-size:0.9em; color:#555; margin-top:10px; border-top:1px dotted #ccc; padding-top:5px;">
+                        Tiempo transcurrido: ${timeStr}
+                        ${etaStr}
+                        <br>
+                        <span style="font-style:italic;">No cierres esta ventana para ver el progreso real.</span>
                     </div>
                 `);
                 

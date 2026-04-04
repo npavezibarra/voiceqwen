@@ -270,12 +270,23 @@ function voiceqwen_reset_status() {
 
     if ( file_exists( $status_file ) ) {
         unlink( $status_file );
-        wp_send_json_success( 'Estado reiniciado' );
+        wp_send_json_success( 'Estado reiniciado y desbloqueado' );
     } else {
         wp_send_json_error( 'No hay proceso activo' );
     }
 }
 add_action( 'wp_ajax_voiceqwen_reset_status', 'voiceqwen_reset_status' );
+
+/**
+ * Check if a background job is already running for the user.
+ */
+function voiceqwen_is_job_running( $user_dir ) {
+    $status_file = $user_dir . '/status.json';
+    if ( ! file_exists( $status_file ) ) return false;
+    
+    $data = json_decode( file_get_contents( $status_file ), true );
+    return ( isset( $data['status'] ) && $data['status'] === 'processing' );
+}
 
 /**
  * AJAX Handler to generate audio.
@@ -312,6 +323,10 @@ function voiceqwen_generate_audio() {
     $user_dir = $upload_dir['basedir'] . '/voiceqwen/' . $username;
     if ( ! file_exists( $user_dir ) ) {
         mkdir( $user_dir, 0755, true );
+    }
+
+    if ( voiceqwen_is_job_running( $user_dir ) ) {
+        wp_send_json_error( 'YA HAY UN PROCESO EN CURSO. Por favor espera a que termine o usa "CANCELAR / RESET" para limpiar el estado.' );
     }
 
     $filename = 'tts_' . time() . '_' . $voice . '.wav';
@@ -392,6 +407,10 @@ function voiceqwen_generate_dialogue() {
     $user_dir = $upload_dir['basedir'] . '/voiceqwen/' . $username;
     if ( ! file_exists( $user_dir ) ) {
         mkdir( $user_dir, 0755, true );
+    }
+
+    if ( voiceqwen_is_job_running( $user_dir ) ) {
+        wp_send_json_error( 'YA HAY UN PROCESO EN CURSO. Por favor espera a que termine o usa "CANCELAR / RESET" para limpiar el estado.' );
     }
 
     $filename = 'dialogue_' . time() . '.wav';

@@ -7,15 +7,17 @@ import soundfile as sf
 import numpy as np
 import re
 import unicodedata
+import gc
+import time
 from qwen_tts import Qwen3TTSModel
 
 # --- CONFIGURACIÓN ---
 MODEL_NAME = "Qwen/Qwen3-TTS-12Hz-1.7B-Base"
 DEVICE = "mps" if torch.backends.mps.is_available() else "cpu"
 SR = 24000 
-SPEAKER_PAUSE = 0.9  # Silencio entre diferentes hablantes
+SPEAKER_PAUSE = 0.2  # Silencio entre diferentes hablantes
 CHUNK_PAUSE = 0.5    # Silencio entre fragmentos del mismo hablante (si el texto es muy largo)
-MAX_WORDS = 45       # Máximo de palabras por fragmento para estabilidad
+MAX_WORDS = 25       # Máximo de palabras por fragmento para estabilidad (reducido para brillo constante)
 
 # Paths to assets
 ASSETS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'assets', 'voices')
@@ -45,13 +47,7 @@ def clean_text(text):
     Elimina caracteres Unicode decorativos (negritas, cursivas matemáticas) 
     que pueden confundir al tokenizador o al modelo.
     """
-    # Normalizamos a forma NFKD para separar acentos si los hubiera, 
-    # pero aquí nos interesa más eliminar estilos "fancy".
-    # Una forma simple es filtrar solo caracteres que el modelo suele entender (ASCII + acentos normales)
     text = unicodedata.normalize('NFKC', text)
-    
-    # También podemos usar regex para quitar rangos de "Mathematical Alphanumeric Symbols" (U+1D400 a U+1D7FF)
-    # pero NFKC suele convertir la mayoría a su forma normal. 
     return text
 
 def parse_dialogue(text):
@@ -59,11 +55,9 @@ def parse_dialogue(text):
     Parses text like '[Fernando]Hola[/Fernando] [Mary Rose]Hola Fernando[/Mary Rose]'
     Returns a list of (voice_id, segment_text)
     """
-    # Regex to find tags like [Name]Content[/Name]. Matches anything between [ and ]
     pattern = r'\[([^\]]+)\](.*?)\[\/\1\]'
     matches = re.findall(pattern, text, re.DOTALL)
     
-    # Pre-calculate normalized mapping for available voices
     def normalize(s):
         return re.sub(r'[^a-zA-Z0-9]', '', s.lower())
 
@@ -101,20 +95,39 @@ def get_safe_chunks(text, max_words=MAX_WORDS):
         chunks.append(" ".join(current_chunk))
     return chunks
 
-def update_status(file_path, current, total, start_time):
+def update_status(file_path, **kwargs):
+    """Saves granular status to JSON for the frontend to poll."""
     if not file_path:
         return
     try:
-        data = {
-            "status": "processing",
-            "current": int(current),
-            "total": int(total),
-            "time": int(start_time)
-        }
+        data = kwargs
+        if "status" not in data:
+            data["status"] = "processing"
         with open(file_path, 'w') as f:
             json.dump(data, f)
     except:
         pass
+
+def take_a_breath(file_path, current, total, start_time, message="Resting / Cleaning RAM..."):
+    """Explicit memory clearing and a short pause to prevent system stalls."""
+    print(f"--- {message} ---", flush=True)
+    update_status(
+        file_path, 
+        current=current, 
+        total=total, 
+        time=start_time, 
+        stage="resting", 
+        message=message
+    )
+    
+    gc.collect()
+    if DEVICE == "mps":
+        torch.mps.empty_cache()
+    elif DEVICE == "cuda":
+        torch.cuda.empty_cache()
+    
+    # 1.5 seconds breath
+    time.sleep(1.5)
 
 def main():
     try:
@@ -156,7 +169,6 @@ def main():
         for i, (voice_id, text) in enumerate(segments):
             current_num = i + 1
             print(f"Procesando segmento {current_num}/{total_segments} con voz '{voice_id}'...", flush=True)
-            update_status(args.status_file, current_num, total_segments, start_time)
             
             voice_config = VOICES[voice_id]
             with open(voice_config["text"], "r", encoding="utf-8") as f:
@@ -164,8 +176,25 @@ def main():
 
             # Split segment into safe chunks if it's too long
             chunks = get_safe_chunks(text)
+            total_chunks = len(chunks)
+            
             for j, chunk in enumerate(chunks):
-                print(f"  - Generando fragmento {j+1}/{len(chunks)}...", flush=True)
+                current_chunk_num = j + 1
+                msg = f"Generando segment {current_num}/{total_segments} (chunk {current_chunk_num}/{total_chunks}) con voz '{voice_id}'"
+                print(f"  - {msg}...", flush=True)
+                
+                update_status(
+                    args.status_file, 
+                    current=current_num, 
+                    total=total_segments, 
+                    sub_current=current_chunk_num,
+                    sub_total=total_chunks,
+                    voice=voice_id,
+                    stage="generating",
+                    message=msg,
+                    time=start_time
+                )
+
                 wavs, _ = tts.generate_voice_clone(
                     text=chunk,
                     ref_audio=[voice_config["audio"]],
@@ -180,6 +209,9 @@ def main():
                 # Pausa entre fragmentos del MISMO personaje
                 if j < len(chunks) - 1:
                     all_audios.append(chunk_pause)
+                
+                # Take a breath after EACH chunk to ensure stability
+                take_a_breath(args.status_file, current_num, total_segments, start_time)
             
             # Pausa entre DIFERENTES personajes
             if i < len(segments) - 1:
@@ -187,21 +219,25 @@ def main():
 
         if all_audios:
             print("Concatenando y guardando diálogo completo...", flush=True)
+            update_status(
+                args.status_file,
+                current=total_segments,
+                total=total_segments,
+                stage="concatenating",
+                message="Saving final file...",
+                time=start_time
+            )
             final_wav = np.concatenate(all_audios)
             sf.write(args.output, final_wav, SR)
             
             # Final status update
-            if args.status_file:
-                try:
-                    with open(args.status_file, 'w') as f:
-                        json.dump({
-                            "status": "completed", 
-                            "current": total_segments, 
-                            "total": total_segments, 
-                            "time": start_time
-                        }, f)
-                except:
-                    pass
+            update_status(
+                args.status_file, 
+                status="completed", 
+                current=total_segments, 
+                total=total_segments, 
+                time=start_time
+            )
                     
             print(f"DONE: {args.output}", flush=True)
             
@@ -213,3 +249,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
