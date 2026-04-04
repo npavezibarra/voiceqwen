@@ -1,9 +1,11 @@
+import argparse
+import sys
+import os
+import json
 import torch
 import soundfile as sf
 import numpy as np
 import re
-import os
-import argparse
 from qwen_tts import Qwen3TTSModel
 
 # --- CONFIGURACIÓN ---
@@ -54,12 +56,28 @@ def get_safe_chunks(text, max_words=45):
         chunks.append(" ".join(current_chunk))
     return chunks
 
+def update_status(file_path, current, total, start_time):
+    if not file_path:
+        return
+    try:
+        data = {
+            "status": "processing",
+            "current": int(current),
+            "total": int(total),
+            "time": int(start_time)
+        }
+        with open(file_path, 'w') as f:
+            json.dump(data, f)
+    except:
+        pass
+
 def main():
     try:
         parser = argparse.ArgumentParser(description="Qwen TTS CLI")
         parser.add_argument("--text", type=str, required=True, help="Text to convert to speech")
         parser.add_argument("--voice", type=str, required=True, help="Voice to use")
         parser.add_argument("--output", type=str, required=True, help="Output wav file path")
+        parser.add_argument("--status_file", type=str, help="Path to status.json file")
         args = parser.parse_args()
 
         if args.voice not in VOICES:
@@ -81,11 +99,25 @@ def main():
         )
 
         chunks = get_safe_chunks(args.text)
-        print(f"Dividido en {len(chunks)} fragmentos.", flush=True)
+        total_chunks = len(chunks)
+        print(f"Dividido en {total_chunks} fragmentos.", flush=True)
+        
+        # Get start time from existing status file if possible
+        start_time = 0
+        if args.status_file and os.path.exists(args.status_file):
+            try:
+                with open(args.status_file, 'r') as f:
+                    sd = json.load(f)
+                    start_time = sd.get("time", 0)
+            except:
+                pass
+
         all_audios = []
 
         for i, chunk in enumerate(chunks):
-            print(f"Procesando fragmento {i+1}/{len(chunks)}...", flush=True)
+            current_num = i + 1
+            print(f"Procesando fragmento {current_num}/{total_chunks}...", flush=True)
+            update_status(args.status_file, current_num, total_chunks, start_time)
             wavs, _ = tts.generate_voice_clone(
                 text=chunk,
                 ref_audio=[voice_config["audio"]],
@@ -105,6 +137,20 @@ def main():
             print("Concatenando y guardando...", flush=True)
             final_wav = np.concatenate(all_audios)
             sf.write(args.output, final_wav, SR)
+            
+            # Final status update
+            if args.status_file:
+                try:
+                    with open(args.status_file, 'w') as f:
+                        json.dump({
+                            "status": "completed", 
+                            "current": total_chunks, 
+                            "total": total_chunks, 
+                            "time": start_time
+                        }, f)
+                except:
+                    pass
+                    
             print(f"DONE: {args.output}", flush=True)
             
     except Exception as e:

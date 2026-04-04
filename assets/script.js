@@ -68,6 +68,48 @@ jQuery(document).ready(function ($) {
         });
     });
 
+    // Generate Dialogue
+    $('#generate-dialogue-btn').on('click', function () {
+        const text = $('#dialogue-text').val();
+        const $btn = $(this);
+        const $status = $('#dialogue-status-msg');
+
+        if (!text) {
+            $status.text('Error: Texto vacío').css('color', 'red');
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append('action', 'voiceqwen_generate_dialogue');
+        formData.append('nonce', voiceqwen_ajax.nonce);
+        formData.append('text', text);
+
+        $btn.prop('disabled', true).text('Procesando...');
+        $status.text('Iniciando diálogo en segundo plano...').css('color', '#000');
+
+        $.ajax({
+            url: voiceqwen_ajax.url,
+            type: 'POST',
+            data: formData,
+            processData: false,
+            contentType: false,
+            success: function (response) {
+                if (response.success && response.data.status === 'processing') {
+                    $status.show().text('Generando diálogo... ten paciencia, esto toma tiempo.').css('color', '#0000ff');
+                    $('#reset-status-btn').removeClass('hidden');
+                    startPolling();
+                } else {
+                    $status.text('Error: ' + response.data).css('color', 'red');
+                    $btn.prop('disabled', false).text('Generar Diálogo');
+                }
+            },
+            error: function () {
+                $status.text('Error de red').css('color', 'red');
+                $btn.prop('disabled', false).text('Generar Diálogo');
+            }
+        });
+    });
+
     // Avatar Upload
     $('.avatar-circle').on('click', function (e) {
         e.preventDefault();
@@ -240,21 +282,32 @@ jQuery(document).ready(function ($) {
             const $reset = $('#reset-status-btn');
 
             if (response.success && response.data.status === 'processing') {
-                const startTime = response.data.details.time;
+                const details = response.data.details;
+                const startTime = details.time;
                 const elapsed = Math.floor((Date.now() / 1000) - startTime);
                 const minutes = Math.floor(elapsed / 60);
-                const seconds = elapsed % 100; // corrected from % 60 to % 60 in my thought but logic says elapsed % 60
+                const seconds = elapsed % 60;
                 
-                let timeStr = `${minutes}m ${elapsed % 60}s`;
+                let progressStr = "";
+                if (details.current && details.total) {
+                    progressStr = `<div style="color:#ff00ff; font-weight:bold; font-size:1.1em; margin: 10px 0;">🚀 PROCESANDO SEGMENTO ${details.current} DE ${details.total}...</div>`;
+                }
+
+                let timeStr = `${minutes}m ${seconds}s`;
                 $status.show().html(`
                     <div style="font-weight:bold; margin-bottom:5px; color:#0000ff;">
                         ⚡ Generando con Qwen3-TTS 1.7B...
                     </div>
+                    ${progressStr}
                     <div style="font-size:0.9em; color:#555;">
                         Tiempo transcurrido: ${timeStr}<br>
                         (El modelo es pesado, ten paciencia. El archivo aparecerá solo al finalizar).
                     </div>
                 `);
+                
+                // Update dialogue status too if it's the one active
+                $('#dialogue-status-msg').show().html($status.html());
+
                 $btn.prop('disabled', true).text('Procesando...');
                 $reset.removeClass('hidden');
                 
@@ -272,6 +325,11 @@ jQuery(document).ready(function ($) {
                 if ($btn.text() === 'Procesando...') {
                     $status.text('¡Proceso finalizado!').css('color', 'green');
                     $btn.prop('disabled', false).text('Generar Audio');
+                    
+                    // Also reset dialogue button if it was active
+                    $('#generate-dialogue-btn').prop('disabled', false).text('Generar Diálogo');
+                    $('#dialogue-status-msg').text('¡Diálogo listo!').css('color', 'green');
+
                     $reset.addClass('hidden');
                     loadFileList();
                 }
@@ -440,6 +498,7 @@ jQuery(document).ready(function ($) {
 
     // Initial load
     loadFileList();
+    loadVoices();
     checkBackgroundStatus(); 
 
     // Audio Analysis Logic

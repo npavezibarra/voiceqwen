@@ -93,6 +93,7 @@ function voiceqwen_ui_shortcode() {
             <div class="vapor-title">ARCHETYPICAL CHILEAN</div>
             <div class="vapor-nav">
                 <button class="nav-btn active" data-view="create">CREATE AUDIO</button>
+                <button class="nav-btn" data-view="dialogues">DIALOGUES</button>
                 <button class="nav-btn" data-view="upload-voice">UPLOAD VOICE</button>
             </div>
         </div>
@@ -184,6 +185,27 @@ function voiceqwen_ui_shortcode() {
                     </form>
                     <div id="upload-status" style="margin-top: 15px;"></div>
                 </div>
+            </div>
+
+            <!-- View 4: Dialogues -->
+            <div class="vapor-window main view-pane hidden" id="view-dialogues">
+                <div class="vapor-window-header">
+                    <div class="vapor-dots"><span></span><span></span><span></span></div>
+                    <div class="vapor-window-title">MULTI-VOICE DIALOGUES</div>
+                </div>
+                
+                <div class="vapor-pane">
+                    <div style="background: rgba(0,0,255,0.05); padding: 10px; border: 1px dashed #0000ff; margin-bottom: 10px; font-size: 14px;">
+                        <strong>Cómo usar:</strong> Envuelve cada diálogo con etiquetas como <code>[Fernando]Hola![/Fernando]</code>. 
+                        Los nombres deben coincidir con los personajes creados.
+                    </div>
+                    <textarea id="dialogue-text" placeholder="[Fernando]Hola Mary Rose, ¿cómo estás?[/Fernando] [Mary Rose]¡Muy bien Fernando! ¿Y tú?[/Mary Rose]" style="height: 200px;"></textarea>
+                </div>
+
+                <div class="controls">
+                    <button id="generate-dialogue-btn" class="vapor-btn-main">Generar Diálogo</button>
+                </div>
+                <div id="dialogue-status-msg"></div>
             </div>
 
             <!-- View 3: Analysis -->
@@ -302,17 +324,18 @@ function voiceqwen_generate_audio() {
 
     $script_path = plugin_dir_path( __FILE__ ) . 'tts_cli.py';
     
+    $status_file = $user_dir . '/status.json';
     $cmd = sprintf(
-        '%s %s --text %s --voice %s --output %s',
+        '%s %s --text %s --voice %s --output %s --status_file %s',
         escapeshellarg( $python_path ),
         escapeshellarg( $script_path ),
         escapeshellarg( $text ),
         escapeshellarg( $voice ),
-        escapeshellarg( $output_path )
+        escapeshellarg( $output_path ),
+        escapeshellarg( $status_file )
     );
 
     // Write status file to track background job
-    $status_file = $user_dir . '/status.json';
     file_put_contents( $status_file, json_encode( array( 'status' => 'processing', 'filename' => $filename, 'time' => time() ) ) );
 
     // Build the background job script
@@ -348,6 +371,78 @@ function voiceqwen_generate_audio() {
 add_action( 'wp_ajax_voiceqwen_generate_audio', 'voiceqwen_generate_audio' );
 
 /**
+ * AJAX Handler to generate dialogue audio.
+ */
+function voiceqwen_generate_dialogue() {
+    check_ajax_referer( 'voiceqwen_nonce', 'nonce' );
+
+    if ( ! is_user_logged_in() ) {
+        wp_send_json_error( 'Usuario no identificado.' );
+    }
+
+    $current_user = wp_get_current_user();
+    $username = $current_user->user_login;
+
+    $text = sanitize_textarea_field( $_POST['text'] );
+    if ( empty( $text ) ) {
+        wp_send_json_error( 'El texto está vacío.' );
+    }
+
+    $upload_dir = wp_upload_dir();
+    $user_dir = $upload_dir['basedir'] . '/voiceqwen/' . $username;
+    if ( ! file_exists( $user_dir ) ) {
+        mkdir( $user_dir, 0755, true );
+    }
+
+    $filename = 'dialogue_' . time() . '.wav';
+    $output_path = $user_dir . '/' . $filename;
+    $log_path = $user_dir . '/last_job.log';
+
+    $python_path = '/Users/nicolas/Local Sites/voiceqwen/app/public/qwet_test/.venv/bin/python3';
+    if ( ! file_exists( $python_path ) ) $python_path = 'python3';
+
+    $script_path = plugin_dir_path( __FILE__ ) . 'tts_dialogue.py';
+    
+    $status_file = $user_dir . '/status.json';
+    $cmd = sprintf(
+        '%s %s --text %s --output %s --status_file %s',
+        escapeshellarg( $python_path ),
+        escapeshellarg( $script_path ),
+        escapeshellarg( $text ),
+        escapeshellarg( $output_path ),
+        escapeshellarg( $status_file )
+    );
+
+    file_put_contents( $status_file, json_encode( array( 'status' => 'processing', 'filename' => $filename, 'time' => time() ) ) );
+
+    $script_lines = array(
+        '#!/bin/bash',
+        'export PYTHONIOENCODING=utf-8',
+        sprintf( '%s > %s 2>&1', $cmd, escapeshellarg( $log_path ) ),
+        'rm -f ' . escapeshellarg( $status_file )
+    );
+    
+    $job_script = $user_dir . '/run_job.sh';
+    file_put_contents( $job_script, implode("\n", $script_lines) . "\n" );
+    chmod( $job_script, 0755 );
+
+    $nohup_path = '/usr/bin/nohup';
+    $bash_path = '/bin/bash';
+    if (!file_exists($nohup_path)) $nohup_path = 'nohup';
+    if (!file_exists($bash_path)) $bash_path = 'bash';
+
+    $final_cmd = sprintf( "%s %s %s > /dev/null 2>&1 &", $nohup_path, $bash_path, escapeshellarg( $job_script ) );
+    exec( $final_cmd );
+
+    wp_send_json_success( array(
+        'status'   => 'processing',
+        'message'  => 'Generando diálogo...',
+        'filename' => $filename
+    ) );
+}
+add_action( 'wp_ajax_voiceqwen_generate_dialogue', 'voiceqwen_generate_dialogue' );
+
+/**
  * AJAX Handler to check background job status.
  */
 function voiceqwen_check_status() {
@@ -371,7 +466,10 @@ function voiceqwen_check_status() {
             return;
         }
 
-        wp_send_json_success( array( 'status' => 'processing', 'details' => $status_data ) );
+        wp_send_json_success( array( 
+            'status' => $status_data['status'] === 'completed' ? 'completed' : 'processing', 
+            'details' => $status_data 
+        ) );
     } else {
         wp_send_json_success( array( 'status' => 'idle' ) );
     }
