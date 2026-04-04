@@ -441,4 +441,152 @@ jQuery(document).ready(function ($) {
     // Initial load
     loadFileList();
     checkBackgroundStatus(); 
+
+    // Audio Analysis Logic
+    $('#run-analysis-btn').on('click', function() {
+        const $btn = $(this);
+        const $loading = $('#analysis-loading');
+        const $results = $('#analysis-results-container');
+        const $tableBody = $('#analysis-results-body');
+        const $summary = $('#analysis-summary-content');
+        const $rec = $('#analysis-recommendation-content');
+
+        $btn.prop('disabled', true).text('ANALYZING...');
+        $loading.removeClass('hidden');
+        $results.addClass('hidden');
+        $tableBody.empty();
+
+        $.post(voiceqwen_ajax.url, {
+            action: 'voiceqwen_analyze_audio',
+            nonce: voiceqwen_ajax.nonce
+        }, function(response) {
+            $btn.prop('disabled', false).text('Analyze My Files');
+            $loading.addClass('hidden');
+
+            if (response.success) {
+                const data = response.data;
+                
+                // 1. Fill Table
+                data.results.forEach(function(res) {
+                    if (res.error) {
+                        $tableBody.append(`
+                            <tr>
+                                <td colspan="6" style="color:red;">Error processing ${res.filename}: ${res.error}</td>
+                            </tr>
+                        `);
+                        return;
+                    }
+
+                    const statusClass = res.pass ? 'status-pass' : 'status-fail';
+                    const statusText = res.pass ? 'PASS' : 'FAIL';
+                    const notes = res.checks.join(', ') || 'Compliant';
+
+                    $tableBody.append(`
+                        <tr>
+                            <td>${res.filename}</td>
+                            <td>${res.duration.toFixed(2)}s</td>
+                            <td style="color: ${res.peak_db > -3 ? 'red' : 'inherit'}">${res.peak_db.toFixed(2)} dB</td>
+                            <td style="color: ${(res.rms_db < -23 || res.rms_db > -18) ? 'red' : 'inherit'}">${res.rms_db.toFixed(2)} dB</td>
+                            <td>${res.noise_floor === -99 ? 'N/A' : res.noise_floor.toFixed(2) + ' dB'}</td>
+                            <td class="${statusClass}">${statusText}<br><small style="font-size:12px; color:#666;">${notes}</small></td>
+                        </tr>
+                    `);
+                });
+
+                // 2. Fill Summary
+                if (data.summary) {
+                    const s = data.summary;
+                    $summary.html(`
+                        <div class="summary-item"><span class="summary-label">Total Files:</span> ${s.total_files}</div>
+                        <div class="summary-item"><span class="summary-label">Compliant:</span> <span class="status-pass">${s.files_passing}</span></div>
+                        <div class="summary-item"><span class="summary-label">Non-Compliant:</span> <span class="status-fail">${s.files_failing}</span></div>
+                        <div class="summary-item"><span class="summary-label">Median RMS:</span> ${s.median_rms} dB</div>
+                        <div class="summary-item"><span class="summary-label">Loudest:</span> ${s.loudest}</div>
+                        <div class="summary-item"><span class="summary-label">Quietest:</span> ${s.quietest}</div>
+                        <div class="summary-item"><span class="summary-label">Batch Consistency:</span> ${s.is_consistent ? 'YES' : 'NO (High Variance)'}</div>
+                    `);
+
+                    // 3. Fill Recommendation
+                    $rec.html(`
+                        <div class="recommendation-box">
+                            <p><strong>Finding:</strong> ${s.recommendation_text}</p>
+                            <p><strong>Suggested Next Step:</strong><br>${s.next_step}</p>
+                        </div>
+                    `);
+                }
+
+                $results.removeClass('hidden');
+            } else {
+                alert('Error: ' + response.data);
+            }
+        });
+    });
+
+    // Frontend Analyze Logic
+    $('#frontend-analyze-btn').on('click', function() {
+        const $view = $('#id-view-analysis');
+        const $loading = $('#fn-analysis-loading');
+        const $results = $('#fn-analysis-results');
+        const $body = $('#fn-analysis-body');
+        const $summary = $('#fn-analysis-summary');
+        const $rec = $('#fn-analysis-recommendation');
+
+        // Switch view
+        $('.view-pane').addClass('hidden');
+        $view.removeClass('hidden');
+        
+        $loading.removeClass('hidden');
+        $results.addClass('hidden');
+        $body.empty();
+
+        $.post(voiceqwen_ajax.url, {
+            action: 'voiceqwen_analyze_audio',
+            nonce: voiceqwen_ajax.nonce
+        }, function(response) {
+            $loading.addClass('hidden');
+
+            if (response.success) {
+                const data = response.data;
+                $results.removeClass('hidden');
+
+                data.results.forEach(function(res) {
+                    if (res.error) return;
+                    const statusClass = res.pass ? 'status-pass' : 'status-fail';
+                    $body.append(`
+                        <tr style="border-bottom: 1px dotted #ccc;">
+                            <td style="padding: 5px; font-size: 14px;">${res.filename}</td>
+                            <td style="padding: 5px;">${res.peak_db.toFixed(1)}</td>
+                            <td style="padding: 5px;">${res.rms_db.toFixed(1)}</td>
+                            <td style="padding: 5px;" class="${statusClass}">${res.pass ? 'OK' : 'FAIL'}</td>
+                        </tr>
+                    `);
+                });
+
+                if (data.summary) {
+                    const s = data.summary;
+                    $summary.html(`
+                        <div style="font-size: 18px; color: #0000ff;">BATCH SUMMARY</div>
+                        <div>Total: ${s.total_files} | Passing: ${s.files_passing}</div>
+                        <div>Median RMS: ${s.median_rms} dB</div>
+                    `);
+                    $rec.html(`
+                        <div style="color: #ff00ff; font-weight: bold;">RECOMMENDATION:</div>
+                        <div style="font-size: 14px;">${s.recommendation_text}</div>
+                        <div style="font-size: 14px; margin-top: 5px; font-weight: bold;">👉 ${s.next_step}</div>
+                    `);
+                }
+            } else {
+                alert('Analysis failed: ' + response.data);
+                $('#view-create').removeClass('hidden');
+                $view.addClass('hidden');
+            }
+        });
+    });
+
+    $(document).on('click', '.nav-btn-back', function() {
+        const view = $(this).data('view');
+        $('.view-pane').addClass('hidden');
+        $(`#view-${view}`).removeClass('hidden');
+    });
 });
+

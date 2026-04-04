@@ -449,3 +449,14 @@ html {
 .hidden {
     display: none !important;
 }
+
+.status-pass {
+    color: #008800 !important;
+    font-weight: bold;
+}
+
+.status-fail {
+    color: #ff0000 !important;
+    font-weight: bold;
+}
+

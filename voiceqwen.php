@@ -10,6 +10,10 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit; // Exit if accessed directly.
 }
 
+// Include required classes
+require_once plugin_dir_path( __FILE__ ) . 'includes/class-voiceqwen-audio-analyzer.php';
+
+
 if ( ! defined( 'ABSPATH' ) ) {
     exit; // Exit if accessed directly.
 }
@@ -40,6 +44,23 @@ function voiceqwen_enqueue_assets() {
     ) );
 }
 add_action( 'wp_enqueue_scripts', 'voiceqwen_enqueue_assets' );
+
+/**
+ * Enqueue scripts and styles for admin.
+ */
+function voiceqwen_admin_enqueue_assets( $hook ) {
+    if ( 'toplevel_page_audio-analysis' !== $hook ) {
+        return;
+    }
+    wp_enqueue_style( 'voiceqwen-admin-style', plugins_url( 'assets/style.css', __FILE__ ) );
+    wp_enqueue_script( 'voiceqwen-admin-script', plugins_url( 'assets/script.js', __FILE__ ), array( 'jquery' ), '1.0', true );
+    wp_localize_script( 'voiceqwen-admin-script', 'voiceqwen_ajax', array(
+        'url'   => admin_url( 'admin-ajax.php' ),
+        'nonce' => wp_create_nonce( 'voiceqwen_nonce' )
+    ) );
+}
+add_action( 'admin_enqueue_scripts', 'voiceqwen_admin_enqueue_assets' );
+
 
 /**
  * Get avatar URL for a voice (custom or default).
@@ -82,6 +103,9 @@ function voiceqwen_ui_shortcode() {
                 <div class="vapor-window-header">
                     <div class="vapor-dots"><span></span><span></span><span></span></div>
                     <div class="vapor-window-title">Mis Archivos</div>
+                </div>
+                <div class="sidebar-controls" style="padding: 10px; border-bottom: 2px solid #0000ff; background: rgba(0,0,255,0.05);">
+                    <button id="frontend-analyze-btn" class="nav-btn" style="width: 100%; margin: 0; padding: 5px;">ANALYZE FILES</button>
                 </div>
                 <ul id="file-list" class="vapor-list">
                     <li class="loading">Cargando...</li>
@@ -162,8 +186,47 @@ function voiceqwen_ui_shortcode() {
                 </div>
             </div>
 
+            <!-- View 3: Analysis -->
+            <div class="vapor-window main view-pane hidden" id="id-view-analysis">
+                <div class="vapor-window-header">
+                    <div class="vapor-dots"><span></span><span></span><span></span></div>
+                    <div class="vapor-window-title">AUDIO QUALITY REPORT</div>
+                </div>
+                
+                <div id="fn-analysis-loading" class="hidden" style="text-align: center; padding: 40px;">
+                    <div class="vapor-dots" style="justify-content: center; margin-bottom: 15px;"><span></span><span></span><span></span></div>
+                    <p style="font-size: 24px;">RUNNING QC ENGINE...</p>
+                </div>
+
+                <div id="fn-analysis-results" class="hidden">
+                    <div class="vapor-pane" style="max-height: 400px; overflow-y: auto;">
+                        <table class="fn-report-table" style="width: 100%; border-collapse: collapse;">
+                            <thead>
+                                <tr style="border-bottom: 3px solid #000; text-align: left; color: #0000ff;">
+                                    <th style="padding: 5px;">File</th>
+                                    <th style="padding: 5px;">Peak</th>
+                                    <th style="padding: 5px;">RMS</th>
+                                    <th style="padding: 5px;">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="fn-analysis-body"></tbody>
+                        </table>
+                    </div>
+                    
+                    <div class="vapor-pane" style="border-top: 3px solid #0000ff; background: rgba(255,0,255,0.05);">
+                        <div id="fn-analysis-summary"></div>
+                        <div id="fn-analysis-recommendation" style="margin-top: 15px; padding: 10px; border: 2px dashed #ff00ff;"></div>
+                    </div>
+                </div>
+
+                <div class="controls" style="padding: 10px;">
+                    <button class="nav-btn-back" data-view="create" style="background:#fff; border:2px solid #000; color:#000; padding:5px 10px; cursor:pointer;">← BACK TO CREATE</button>
+                </div>
+            </div>
+
         </div>
         <div class="vapor-deco-text">90's</div>
+
     </div>
     <?php
     return ob_get_clean();
@@ -568,3 +631,70 @@ function voiceqwen_upload_voice() {
     wp_send_json_success( 'Voz guardada exitosamente.' );
 }
 add_action( 'wp_ajax_voiceqwen_upload_voice', 'voiceqwen_upload_voice' );
+
+/**
+ * Admin Menu Page
+ */
+function voiceqwen_admin_menu() {
+    add_menu_page(
+        'Audio Analysis',
+        'Audio Analysis',
+        'manage_options',
+        'audio-analysis',
+        'voiceqwen_render_analysis_page',
+        'dashicons-performance',
+        6
+    );
+}
+add_action( 'admin_menu', 'voiceqwen_admin_menu' );
+
+/**
+ * Render Audio Analysis page.
+ */
+function voiceqwen_render_analysis_page() {
+    $deps = VoiceQwen_Audio_Analyzer::check_dependencies();
+    include plugin_dir_path( __FILE__ ) . 'templates/admin/audio-analysis-page.php';
+}
+
+/**
+ * AJAX: Run Audio Analysis.
+ */
+function voiceqwen_analyze_audio() {
+    check_ajax_referer( 'voiceqwen_nonce', 'nonce' );
+
+    if ( ! is_user_logged_in() ) {
+        wp_send_json_error( 'Unauthorized' );
+    }
+
+    $current_user = wp_get_current_user();
+    $username = $current_user->user_login;
+    $upload_dir = wp_upload_dir();
+    $user_dir = $upload_dir['basedir'] . '/voiceqwen/' . $username;
+
+    if ( ! file_exists( $user_dir ) ) {
+        wp_send_json_error( 'No audio files found for this user.' );
+    }
+
+    $analyzer = new VoiceQwen_Audio_Analyzer();
+    $files = scandir( $user_dir );
+    $results = array();
+
+    foreach ( $files as $file ) {
+        if ( str_contains( $file, '.wav' ) ) {
+            $results[] = $analyzer->analyze_file( $user_dir . '/' . $file );
+        }
+    }
+
+    if ( empty( $results ) ) {
+        wp_send_json_error( 'No WAV files found in your folder.' );
+    }
+
+    $summary = $analyzer->calculate_batch_summary( $results );
+
+    wp_send_json_success( array(
+        'results' => $results,
+        'summary' => $summary
+    ) );
+}
+add_action( 'wp_ajax_voiceqwen_analyze_audio', 'voiceqwen_analyze_audio' );
+
