@@ -1,0 +1,451 @@
+@import url('https://fonts.googleapis.com/css2?family=VT323&display=swap');
+
+/* Reset and basic setup */
+.vapor-grid-bg {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: -1;
+    background-color: #ffeef2;
+    background-image:
+        linear-gradient(rgba(0, 0, 255, 0.1) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0, 0, 255, 0.1) 1px, transparent 1px);
+    background-size: 40px 40px;
+}
+
+/* Aggressive Layout Fixes to remove title and top spacing */
+header.entry-header,
+.entry-title,
+.post-title,
+.page-title,
+h1.entry-title,
+h1.wp-block-post-title,
+.site-header,
+.site-branding,
+.entry-header {
+    display: none !important;
+}
+
+/* Remove all top spacing from theme containers */
+#content,
+.site-content,
+.entry-content,
+.content-area,
+#primary,
+main,
+article,
+div.wp-block-group.has-background {
+    padding-top: 0 !important;
+    margin-top: 0 !important;
+    top: 0 !important;
+}
+
+/* Ensure the grid background is truly full-screen */
+body,
+html {
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
+.vapor-container {
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 20px;
+    font-family: 'VT323', monospace;
+    position: relative;
+    z-index: 1;
+}
+
+/* Main Header */
+.vapor-header {
+    background: #0000ff;
+    color: #fff;
+    padding: 10px 20px;
+    display: flex;
+    align-items: center;
+    border: 3px solid #000;
+    margin-bottom: 30px;
+    box-shadow: 10px 10px 0px rgba(0, 0, 255, 0.2);
+}
+
+.vapor-dots {
+    display: flex;
+    gap: 5px;
+    margin-right: 15px;
+}
+
+.vapor-dots span {
+    width: 8px;
+    height: 8px;
+    background: #fff;
+    border-radius: 50%;
+    border: 1px solid #000;
+}
+
+.vapor-title {
+    font-size: 24px;
+    text-transform: lowercase;
+}
+
+.vapor-nav {
+    margin-left: auto;
+    display: flex;
+    gap: 10px;
+}
+
+.nav-btn {
+    background: #fff;
+    border: 2px solid #000;
+    color: #000;
+    font-family: 'VT323', monospace;
+    font-size: 18px;
+    padding: 2px 15px;
+    cursor: pointer;
+    box-shadow: 4px 4px 0px rgba(0, 0, 0, 0.2);
+    transition: all 0.1s;
+}
+
+.nav-btn.active {
+    background: #ff00ff;
+    color: #fff;
+    box-shadow: none;
+    transform: translate(2px, 2px);
+}
+
+.nav-btn:hover:not(.active) {
+    background: #ffeef2;
+}
+
+/* Forms */
+.form-group {
+    margin-bottom: 20px;
+}
+
+.form-group label {
+    display: block;
+    font-size: 20px;
+    color: #0000ff;
+    margin-bottom: 5px;
+}
+
+.form-group input[type="text"],
+.form-group textarea {
+    width: 100%;
+    border: 3px solid #0000ff;
+    padding: 8px;
+    font-family: 'VT323', monospace;
+    font-size: 18px;
+}
+
+.form-group input[type="file"] {
+    font-family: 'VT323', monospace;
+    font-size: 16px;
+}
+
+.form-group small {
+    display: block;
+    color: #888;
+    font-size: 16px;
+    margin-top: 2px;
+}
+
+/* Body and Windows */
+.vapor-body {
+    display: flex;
+    gap: 30px;
+    align-items: flex-start;
+}
+
+.vapor-window {
+    background: #fff;
+    border: 3px solid #0000ff;
+    padding: 0;
+    position: relative;
+    box-shadow: 8px 8px 0px rgba(0, 0, 0, 0.1);
+}
+
+.vapor-window.sidebar {
+    width: 300px;
+}
+
+.vapor-window.main {
+    flex: 1;
+}
+
+.vapor-window-header {
+    background: #fff;
+    border-bottom: 3px solid #0000ff;
+    padding: 8px 15px;
+    display: flex;
+    align-items: center;
+}
+
+.vapor-window-header .vapor-dots span {
+    background: #0000ff;
+    border-color: #0000ff;
+}
+
+.vapor-window-title {
+    color: #0000ff;
+    font-size: 20px;
+}
+
+/* List */
+.vapor-list {
+    list-style: none;
+    margin: 0;
+    padding: 10px;
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.vapor-list li {
+    padding: 8px;
+    border-bottom: 2px dotted #0000ff;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 18px;
+    cursor: pointer;
+    color: #000;
+}
+
+.vapor-list li:hover {
+    background: #ffeef2;
+}
+
+.vapor-list li .delete-btn,
+.trash-btn {
+    background: #fff;
+    border: 2px solid #0000ff;
+    color: #0000ff;
+    font-family: 'VT323', monospace;
+    font-size: 14px;
+    cursor: pointer;
+    padding: 0 4px;
+    margin-left: 5px;
+    transition: all 0.1s;
+}
+
+.trash-btn:hover {
+    background: #ff00ff;
+    color: #fff;
+    border-color: #ff00ff;
+}
+
+/* Tabs */
+.vapor-tabs {
+    display: flex;
+    padding: 15px 15px 0;
+}
+
+.vapor-tab {
+    background: #fff;
+    border: 3px solid #0000ff;
+    border-bottom: none;
+    padding: 5px 15px;
+    font-family: 'VT323', monospace;
+    font-size: 20px;
+    cursor: pointer;
+    margin-right: 10px;
+    color: #0000ff;
+}
+
+.vapor-tab.active {
+    background: #0000ff;
+    color: #fff;
+}
+
+/* Pane */
+.vapor-pane {
+    padding: 15px;
+}
+
+#tts-text {
+    width: 100%;
+    height: 150px;
+    border: 3px solid #0000ff;
+    padding: 10px;
+    font-family: 'VT323', monospace;
+    font-size: 20px;
+    background: #fff;
+    color: #000;
+}
+
+#tts-text:focus {
+    outline: 2px solid #ff00ff;
+}
+
+/* Voice Selector (Avatars) */
+.voice-selector {
+    padding: 15px;
+    display: flex;
+    gap: 30px;
+    justify-content: center;
+    border-bottom: 2px solid #0000ff;
+    background: rgba(0, 0, 255, 0.05);
+}
+
+.avatar-radio {
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    position: relative;
+}
+
+.avatar-radio input {
+    position: absolute;
+    opacity: 0;
+    cursor: pointer;
+}
+
+.avatar-circle {
+    width: 70px;
+    height: 70px;
+    border-radius: 50%;
+    border: 3px solid #0000ff;
+    background-size: cover;
+    background-position: center;
+    transition: all 0.2s;
+    box-shadow: 4px 4px 0px rgba(0, 0, 0, 0.1);
+}
+
+.avatar-name {
+    font-family: 'VT323', monospace;
+    font-size: 18px;
+    color: #0000ff;
+}
+
+/* Selected state */
+.avatar-radio input:checked+.avatar-circle {
+    border-color: #ff00ff;
+    box-shadow: 0 0 15px #ff00ff;
+    transform: scale(1.1);
+}
+
+.avatar-radio input:checked~.avatar-name {
+    color: #ff00ff;
+    font-weight: bold;
+}
+
+/* Main Button */
+.vapor-btn-main {
+    width: calc(100% - 30px);
+    margin: 15px;
+    background: #0000ff;
+    color: #fff;
+    border: 3px solid #000;
+    padding: 10px;
+    font-family: 'VT323', monospace;
+    font-size: 24px;
+    cursor: pointer;
+    transition: transform 0.1s;
+}
+
+.vapor-btn-main:active {
+    transform: translate(4px, 4px);
+}
+
+.vapor-btn-main:disabled {
+    background: #888;
+    cursor: not-allowed;
+}
+
+/* Status and Audio */
+#status-msg {
+    padding: 0 15px 15px;
+    font-size: 18px;
+    color: #000;
+}
+
+#audio-container {
+    padding: 0 15px 15px;
+}
+
+.vapor-deco-text {
+    position: absolute;
+    top: -20px;
+    right: 20px;
+    font-size: 80px;
+    color: #0000ff;
+    opacity: 0.1;
+    /* Reduced opacity for better readability */
+    font-weight: bold;
+    z-index: -1;
+}
+
+.hidden {
+    display: none;
+}
+
+/* Context Menu */
+.vapor-context-menu {
+    position: absolute;
+    background: #fff;
+    border: 3px solid #0000ff;
+    z-index: 1000;
+    width: 120px;
+    box-shadow: 6px 6px 0px rgba(0, 0, 0, 0.1);
+}
+
+.vapor-context-menu div {
+    padding: 8px 12px;
+    cursor: pointer;
+    font-size: 18px;
+    color: #0000ff;
+    border-bottom: 2px dotted #0000ff;
+}
+
+.vapor-context-menu div:last-child {
+    border-bottom: none;
+}
+
+.vapor-context-menu div:hover {
+    background: #ffeef2;
+}
+
+/* Rename Input */
+.vapor-rename-input {
+    background: #fff;
+    border: 2px solid #0000ff;
+    font-family: 'VT323', monospace;
+    font-size: 18px;
+    padding: 2px 5px;
+    width: 100%;
+    color: #000;
+}
+/* Avatar Overlay */
+.avatar-circle {
+    position: relative;
+    overflow: hidden;
+}
+
+.avatar-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 255, 0.7);
+    color: #fff;
+    font-family: 'VT323', monospace;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: opacity 0.2s;
+    pointer-events: none;
+}
+
+.avatar-circle:hover .avatar-overlay {
+    opacity: 1;
+}
+
+.hidden {
+    display: none !important;
+}

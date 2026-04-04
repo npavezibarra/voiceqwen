@@ -1,0 +1,20 @@
+# Temporary and Log files
+*.log
+status.json
+run_job.sh
+
+# Python artifacts
+__pycache__/
+*.pyc
+
+# Test scripts
+run_mps_test.php
+run_test.php
+test_audio.py
+test_mps.sh
+test_mps.py
+run_mps_test.php
+test_audio.log
+
+# WordPress/System
+.DS_Store
