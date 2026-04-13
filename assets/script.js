@@ -1,9 +1,11 @@
 jQuery(document).ready(function ($) {
     let pollingInterval = null;
+    let wavesurfer = null;
+    let wsRegions = null;
+    let activeFileUrl = '';
+    let activeFileName = '';
 
-    // Load initial file list and check for background jobs
-    loadFileList();
-    checkBackgroundStatus();
+    // Initial load is handled at the bottom of the file to ensure everything is defined.
 
     // Tab switching
     $('.vapor-tab').on('click', function () {
@@ -20,11 +22,13 @@ jQuery(document).ready(function ($) {
         const voice = $('input[name="voice"]:checked').val();
         const $btn = $(this);
         const $status = $('#status-msg');
+        const stability = $('#tts-stability').val();
 
         const formData = new FormData();
         formData.append('action', 'voiceqwen_generate_audio');
         formData.append('nonce', voiceqwen_ajax.nonce);
         formData.append('voice', voice);
+        formData.append('stability', stability);
 
         if (activeTab === 'textarea') {
             const text = $('#tts-text').val();
@@ -73,6 +77,7 @@ jQuery(document).ready(function ($) {
         const text = $('#dialogue-text').val();
         const $btn = $(this);
         const $status = $('#dialogue-status-msg');
+        const stability = $('#dialogue-stability').val();
 
         if (!text) {
             $status.text('Error: Texto vacío').css('color', 'red');
@@ -83,6 +88,7 @@ jQuery(document).ready(function ($) {
         formData.append('action', 'voiceqwen_generate_dialogue');
         formData.append('nonce', voiceqwen_ajax.nonce);
         formData.append('text', text);
+        formData.append('stability', stability);
 
         $btn.prop('disabled', true).text('Procesando...');
         $status.text('Iniciando diálogo en segundo plano...').css('color', '#000');
@@ -173,13 +179,17 @@ jQuery(document).ready(function ($) {
     });
 
     // Navigation (View Switching)
-    $('.nav-btn').on('click', function() {
+    $('.vapor-nav .nav-btn').on('click', function() {
         const view = $(this).data('view');
-        $('.nav-btn').removeClass('active');
+        if (!view) return; // Safety check
+        
+        $('.vapor-nav .nav-btn').removeClass('active');
         $(this).addClass('active');
         
         $('.view-pane').addClass('hidden');
-        $(`#view-${view}`).removeClass('hidden');
+        if ($(`#view-${view}`).length) {
+            $(`#view-${view}`).removeClass('hidden');
+        }
 
         if (view === 'create') {
             loadVoices();
@@ -194,6 +204,9 @@ jQuery(document).ready(function ($) {
         }, function(response) {
             if (response.success) {
                 $selector.empty();
+                const $chips = $('#dialogue-voice-chips');
+                if ($chips.length) $chips.empty();
+
                 response.data.forEach(function(voice, index) {
                     const checked = index === 0 ? 'checked' : '';
                     const html = `
@@ -205,6 +218,34 @@ jQuery(document).ready(function ($) {
                         </label>
                     `;
                     $selector.append(html);
+
+                    // Add to Dialogues Chips
+                    if ($chips.length) {
+                        const $chip = $(`<button type="button" class="nav-btn" style="font-size: 14px; padding: 4px 10px; border-style: dashed; background: #fff; cursor: pointer;">[${voice.name}]</button>`);
+                        $chip.on('click', function() {
+                            const $textarea = $('#dialogue-text');
+                            const val = $textarea.val();
+                            const tagStart = `[${voice.name}]`;
+                            const tagEnd = `[/${voice.name}]`;
+                            const pos = $textarea[0].selectionStart;
+                            const end = $textarea[0].selectionEnd;
+                            
+                            const textBefore = val.substring(0, pos);
+                            const textAfter = val.substring(end);
+                            const selectedText = val.substring(pos, end);
+
+                            const newText = textBefore + tagStart + selectedText + tagEnd + textAfter;
+                            $textarea.val(newText);
+                            $textarea.focus();
+                            
+                            // Move cursor inside tags if no text was selected
+                            if (pos === end) {
+                                const newPos = pos + tagStart.length;
+                                $textarea[0].setSelectionRange(newPos, newPos);
+                            }
+                        });
+                        $chips.append($chip);
+                    }
                 });
             }
         });
@@ -330,10 +371,11 @@ jQuery(document).ready(function ($) {
                 let timeStr = `${minutes}m ${seconds}s`;
                 
                 // ETA Calculation
-                let etaStr = "";
+                let etaStr = ``;
                 const completedSegments = parseInt(details.current) - 1;
-                if (completedSegments > 0 && details.total) {
-                    const totalSegments = parseInt(details.total);
+                const totalSegments = parseInt(details.total);
+
+                if (completedSegments > 0 && totalSegments) {
                     const secondsPerSegment = elapsed / completedSegments;
                     const remainingSegments = totalSegments - completedSegments;
                     const etaSeconds = Math.floor(secondsPerSegment * remainingSegments);
@@ -341,20 +383,31 @@ jQuery(document).ready(function ($) {
                     if (etaSeconds > 0) {
                         const etaMins = Math.floor(etaSeconds / 60);
                         const etaSecs = etaSeconds % 60;
-                        etaStr = `<div style="color:#000; font-weight:bold; margin-top:5px; background: rgba(0,0,0,0.05); padding: 5px; border-left: 3px solid #000;">🕒 Tiempo restante estimado: ${etaMins}m ${etaSecs}s</div>`;
+                        etaStr = `<div style="color:#000; font-weight:bold; margin:10px 0; background: rgba(0,255,255,0.05); padding: 8px; border-left: 4px solid #0000ff; border-top: 1px solid #0000ff; border-right: 1px solid #0000ff; border-bottom: 5px solid #0000ff;">🕒 TIEMPO RESTANTE ESTIMADO: ${etaMins}m ${etaSecs}s</div>`;
                     }
+                } else if (totalSegments > 1) {
+                    // During the very first fragment
+                    etaStr = `<div style="color:#666; font-style:italic; margin:10px 0; padding: 5px; border-left: 3px solid #ccc;">🕒 Calculando tiempo restante... (esperando completar primer segmento)</div>`;
                 }
 
+                const currentFrag = details.current || "...";
+                const totalFrags = details.total || "...";
+                const displayMsg = details.message || (details.current ? `Procesando fragmento ${details.current}` : "Iniciando sistema y cargando modelo...");
+
                 $status.show().html(`
-                    <div style="font-weight:bold; margin-bottom:5px; color:${statusColor};">
-                        ${statusEmoji} Qwen3-TTS: ${details.message || 'Procesando...'}
+                    <div style="background:#0000ff; color:#fff; padding:5px 10px; margin-bottom:10px; font-weight:bold; display:flex; justify-content:space-between;">
+                        <span>${statusEmoji} ESTADO DEL PROCESO</span>
+                        <span>FRAGMENTO ${currentFrag} de ${totalFrags}</span>
                     </div>
-                    ${progressStr}
-                    <div style="font-size:0.9em; color:#555; margin-top:10px; border-top:1px dotted #ccc; padding-top:5px;">
-                        Tiempo transcurrido: ${timeStr}
+                    <div style="border:2px solid #0000ff; padding:15px; background:rgba(0,0,255,0.02);">
+                        <div style="color:${statusColor}; font-weight:bold; font-size:1.1em; margin-bottom: 10px;">
+                            ${statusEmoji} ${displayMsg.toUpperCase()}
+                        </div>
+                        ${progressStr}
                         ${etaStr}
-                        <br>
-                        <span style="font-style:italic;">No cierres esta ventana para ver el progreso real.</span>
+                        <div style="font-size:0.95em; color:#333; margin-top:15px; padding-top:10px; border-top:2px dotted #0000ff;">
+                            <b>Tiempo transcurrido:</b> ${timeStr}
+                        </div>
                     </div>
                 `);
                 
@@ -390,67 +443,272 @@ jQuery(document).ready(function ($) {
         });
     }
 
+    let currentPath = ''; // Track current folder path
+    let fullFileTree = []; // Store full tree for navigation
+
     function loadFileList() {
         $.post(voiceqwen_ajax.url, {
             action: 'voiceqwen_list_files',
             nonce: voiceqwen_ajax.nonce
         }, function (response) {
             if (response.success) {
-                const $list = $('#file-list');
-                $list.empty();
-                if (response.data.length === 0) {
-                    $list.append('<li>(No hay archivos)</li>');
-                } else {
-                    response.data.forEach(function (file) {
-                        const $li = $(`<li class="file-item" data-filename="${file.name}">
-                            <span class="file-name">${file.name}</span>
-                            <span class="trash-btn" title="Eliminar">🗑️</span>
-                        </li>`);
-
-                        $li.on('click', '.file-name', function (e) {
-                            if (e.ctrlKey) return; 
-                            playAudio(file.url, file.name);
-                        });
-
-                        // Delete handler
-                        $li.on('click', '.trash-btn', function(e) {
-                            e.stopPropagation();
-                            if (!confirm(`¿Borrar ${file.name}?`)) return;
-                            
-                            $.post(voiceqwen_ajax.url, {
-                                action: 'voiceqwen_delete_file',
-                                nonce: voiceqwen_ajax.nonce,
-                                filename: file.name
-                            }, function(res) {
-                                if (res.success) {
-                                    loadFileList();
-                                } else {
-                                    alert(res.data);
-                                }
-                            });
-                        });
-
-                        // CTRL + Click for Context Menu
-                        $li.on('mousedown', function (e) {
-                            if (e.ctrlKey) {
-                                e.preventDefault();
-                                showContextMenu(e, file.name);
-                            }
-                        });
-
-                        $list.append($li);
-                    });
-                }
+                fullFileTree = response.data;
+                renderCurrentPath();
             }
         });
     }
+
+    function renderCurrentPath() {
+        const $list = $('#file-list');
+        $list.empty();
+        
+        // Root Drop Zone (always available for moving items)
+        const $rootDrop = $('<div class="root-drop-zone" data-folder="">Arrastra aquí para mover a la raíz</div>');
+        setupDropZone($rootDrop);
+        $list.append($rootDrop);
+
+        // Back Button if inside a folder
+        if (currentPath !== '') {
+            const $backBtn = $(`<li class="folder-item-back" style="cursor:pointer; padding: 8px; background: rgba(0,0,255,0.1); border-bottom: 2px solid #000; font-weight: bold; margin-bottom: 5px;">
+                <span>⬅️ ATRÁS (RAÍZ)</span>
+            </li>`);
+            $backBtn.on('click', function() {
+                currentPath = '';
+                renderCurrentPath();
+            });
+            $list.append($backBtn);
+        }
+
+        // Find items for current path
+        let itemsToRender = fullFileTree;
+        if (currentPath !== '') {
+            const parts = currentPath.split('/');
+            let current = itemsToRender;
+            for (const part of parts) {
+                const found = current.find(i => i.type === 'folder' && i.name === part);
+                if (found) current = found.children;
+            }
+            itemsToRender = current;
+        }
+
+        if (itemsToRender.length === 0) {
+            $list.append('<li style="padding:10px; opacity:0.5;">(Carpeta vacía)</li>');
+        } else {
+            itemsToRender.forEach(function (item) {
+                if (item.type === 'folder') {
+                    const $folderRow = $(`<li class="folder-item" data-rel="${item.rel_path}" data-filename="${item.name}" draggable="true">
+                        <div class="folder-item-row" style="width: 100%; justify-content: space-between;">
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <span class="folder-icon"></span>
+                                <span class="folder-name">${item.name}</span>
+                            </div>
+                            <span style="font-size: 10px; opacity: 0.5;">ENTRAR ➡️</span>
+                        </div>
+                    </li>`);
+                    
+                    setupDraggable($folderRow);
+                    
+                    // Enter folder
+                    $folderRow.on('click', '.folder-item-row', function(e) {
+                        e.stopPropagation();
+                        currentPath = item.rel_path;
+                        renderCurrentPath();
+                    });
+
+                    // Context menu for Folders
+                    $folderRow.on('contextmenu', '.folder-item-row', function (e) {
+                        e.preventDefault();
+                        showContextMenu(e, item.rel_path, true); // true = isFolder
+                    });
+
+                    setupDropZone($folderRow.find('.folder-item-row'));
+                    $list.append($folderRow);
+                } else {
+                    const $li = $(`<li class="file-item" draggable="true" data-filename="${item.name}" data-rel="${item.rel_path}" data-url="${item.url}">
+                        <span class="file-name">${item.name}</span>
+                        <span class="trash-btn" title="Eliminar">🗑️</span>
+                    </li>`);
+
+                    setupDraggable($li);
+
+                    $li.on('click', '.file-name', function (e) {
+                        if (e.ctrlKey) return;
+                        const activeView = $('.nav-btn.active').data('view');
+                        if (activeView === 'waveform') {
+                            $('.file-item').removeClass('active-file');
+                            $li.addClass('active-file');
+                            activeFileUrl = item.url;
+                            activeFileName = item.name;
+                            loadWaveform(item.url, item.name);
+                        } else {
+                            playAudio(item.url, item.name);
+                        }
+                    });
+
+                    // Context menu for Files
+                    $li.on('contextmenu', function (e) {
+                        e.preventDefault();
+                        showContextMenu(e, item.rel_path, false);
+                    });
+
+                    // Delete handler (trash icon)
+                    $li.on('click', '.trash-btn', function(e) {
+                        e.stopPropagation();
+                        if (!confirm(`¿Borrar ${item.name}?`)) return;
+                        deleteFile(item.rel_path);
+                    });
+
+                    $list.append($li);
+                }
+            });
+        }
+    }
+
+    function setupDraggable($el) {
+        $el.on('dragstart', function(e) {
+            e.originalEvent.dataTransfer.setData('text/plain', $(this).data('rel'));
+            e.originalEvent.dataTransfer.setData('item-name', $(this).data('filename'));
+            $(this).addClass('is-dragging');
+        });
+        
+        $el.on('dragover', function(e) {
+            e.preventDefault();
+            const rect = this.getBoundingClientRect();
+            const relY = e.originalEvent.clientY - rect.top;
+            $(this).removeClass('drag-over-top drag-over-bottom');
+            
+            if (relY < rect.height / 2) {
+                $(this).addClass('drag-over-top');
+            } else {
+                $(this).addClass('drag-over-bottom');
+            }
+        });
+
+        $el.on('dragleave', function() {
+            $(this).removeClass('drag-over-top drag-over-bottom');
+        });
+
+        $el.on('dragend', function() {
+            $(this).removeClass('is-dragging');
+            $('.drag-over-top, .drag-over-bottom').removeClass('drag-over-top drag-over-bottom');
+        });
+
+        $el.on('drop', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            const draggedRel = e.originalEvent.dataTransfer.getData('text/plain');
+            const draggedName = e.originalEvent.dataTransfer.getData('item-name');
+            const targetName = $(this).data('filename');
+            
+            $(this).removeClass('drag-over-top drag-over-bottom');
+            
+            if (draggedRel === $(this).data('rel')) return;
+
+            const isTop = (e.originalEvent.clientY - this.getBoundingClientRect().top) < (this.getBoundingClientRect().height / 2);
+            
+            reorderItems(draggedName, targetName, isTop);
+        });
+    }
+
+    function reorderItems(draggedName, targetName, isTop) {
+        let items = fullFileTree;
+        if (currentPath !== '') {
+            const parts = currentPath.split('/');
+            let current = items;
+            for (const part of parts) {
+                const found = current.find(i => i.type === 'folder' && i.name === part);
+                if (found) current = found.children;
+            }
+            items = current;
+        }
+
+        const draggedIdx = items.findIndex(i => i.name === draggedName);
+        if (draggedIdx === -1) return;
+        const itemObj = items.splice(draggedIdx, 1)[0];
+        
+        let targetIdx = items.findIndex(i => i.name === targetName);
+        if (!isTop) targetIdx++;
+        
+        items.splice(targetIdx, 0, itemObj);
+        
+        const nameOrder = items.map(i => i.name);
+        $.post(voiceqwen_ajax.url, {
+            action: 'voiceqwen_save_order',
+            nonce: voiceqwen_ajax.nonce,
+            rel_path: currentPath,
+            order: nameOrder
+        }, function(res) {
+            if (res.success) {
+                renderCurrentPath();
+            } else {
+                alert("Error al guardar el orden: " + (res.data || "Unknown Error"));
+                loadFileList();
+            }
+        });
+    }
+
+    function setupDropZone($el) {
+        $el.on('dragover', function(e) {
+            e.preventDefault();
+            $(this).addClass('drop-hover');
+        });
+        $el.on('dragleave', function() {
+            $(this).removeClass('drop-hover');
+        });
+        $el.on('drop', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            $(this).removeClass('drop-hover');
+            
+            const itemRel = e.originalEvent.dataTransfer.getData('text/plain');
+            const targetFolder = $(this).hasClass('root-drop-zone') ? '' : ($(this).closest('.folder-item').data('rel') || '');
+            
+            if (itemRel === targetFolder) return;
+            
+            if (targetFolder !== '' && targetFolder.startsWith(itemRel + '/')) {
+                alert("No puedes mover una carpeta dentro de sí misma.");
+                return;
+            }
+
+            $.post(voiceqwen_ajax.url, {
+                action: 'voiceqwen_move_item',
+                nonce: voiceqwen_ajax.nonce,
+                item_rel: itemRel,
+                target_folder: targetFolder
+            }, function(res) {
+                if (res.success) {
+                    loadFileList();
+                } else {
+                    alert(res.data);
+                }
+            });
+        });
+    }
+
+    // New Folder Event
+    $(document).on('click', '#sidebar-new-folder-btn', function() {
+        const name = prompt("Nombre de la nueva carpeta:");
+        if (!name) return;
+        
+        $.post(voiceqwen_ajax.url, {
+            action: 'voiceqwen_create_folder',
+            nonce: voiceqwen_ajax.nonce,
+            folder: name
+        }, function(res) {
+            if (res.success) {
+                loadFileList();
+            } else {
+                alert(res.data);
+            }
+        });
+    });
 
     // Prevent default context menu on CTRL+Click
     $(document).on('contextmenu', '.file-item', function (e) {
         if (e.ctrlKey) e.preventDefault();
     });
 
-    function showContextMenu(e, filename) {
+    function showContextMenu(e, relPath, isFolder = false) {
         $('.vapor-context-menu').remove();
         const $menu = $('<div class="vapor-context-menu"></div>');
         $menu.append('<div class="menu-rename">Rename</div>');
@@ -465,14 +723,14 @@ jQuery(document).ready(function ($) {
 
         $menu.on('click', '.menu-delete', function () {
             $menu.remove();
-            if (confirm('¿Borrar "' + filename + '"?')) {
-                deleteFile(filename);
+            if (confirm(`¿Borrar ${isFolder ? 'la carpeta' : 'el archivo'} "${relPath}"?`)) {
+                deleteFile(relPath);
             }
         });
 
         $menu.on('click', '.menu-rename', function () {
             $menu.remove();
-            renameFilePrompt(filename);
+            renameFilePrompt(relPath, isFolder);
         });
 
         $(document).one('click', function () {
@@ -480,50 +738,76 @@ jQuery(document).ready(function ($) {
         });
     }
 
-    function deleteFile(filename) {
+    function deleteFile(relPath) {
         $.post(voiceqwen_ajax.url, {
             action: 'voiceqwen_delete_file',
             nonce: voiceqwen_ajax.nonce,
-            filename: filename
+            filename: relPath
         }, function (response) {
-            if (response.success) loadFileList();
-        });
-    }
-
-    function renameFilePrompt(filename) {
-        const $li = $(`.file-item[data-filename="${filename}"]`);
-        const $nameSpan = $li.find('.file-name');
-        const currentName = filename.replace('.wav', '');
-        const $input = $(`<input type="text" class="vapor-rename-input" value="${currentName}">`);
-
-        $nameSpan.hide();
-        $li.append($input);
-        $input.focus().select();
-
-        $input.on('keyup', function (e) {
-            if (e.key === 'Enter') {
-                submitRename($input.val(), filename);
-            } else if (e.key === 'Escape') {
+            if (response.success) {
                 loadFileList();
+            } else {
+                alert(response.data || "Error al eliminar");
             }
         });
-
-        $input.on('blur', function () {
-            submitRename($input.val(), filename);
-        });
     }
 
-    function submitRename(newName, oldName) {
-        if (!newName || newName + '.wav' === oldName) {
+    function renameFilePrompt(relPath, isFolder = false) {
+        // Find the element by rel_path
+        const selector = isFolder ? `.folder-item[data-rel="${relPath}"]` : `.file-item[data-rel="${relPath}"]`;
+        const $li = $(selector);
+        const $nameSpan = isFolder ? $li.find('.folder-name') : $li.find('.file-name');
+        
+        const fileName = relPath.split('/').pop();
+        const currentName = isFolder ? fileName : fileName.replace('.wav', '');
+        
+        const $input = $(`<input type="text" class="vapor-rename-input" value="${currentName}" style="width: 100%; margin-top: 5px;">`);
+
+        $nameSpan.hide();
+        if (isFolder) {
+            $li.find('.folder-item-row').append($input);
+        } else {
+            $li.append($input);
+        }
+        $input.focus().select();
+
+        let submitted = false;
+        const finish = () => {
+            if (submitted) return;
+            submitted = true;
+            submitRename($input.val(), relPath, isFolder);
+        };
+
+        $input.on('keyup', function (e) {
+            if (e.key === 'Enter') finish();
+            else if (e.key === 'Escape') loadFileList();
+        });
+
+        $input.on('blur', finish);
+    }
+
+    function submitRename(newName, oldRelPath, isFolder = false) {
+        const oldName = oldRelPath.split('/').pop();
+        const compareName = isFolder ? oldName : oldName.replace('.wav', '');
+
+        if (!newName || newName === compareName) {
             loadFileList();
             return;
         }
 
+        // Final new name
+        const finalNewName = isFolder ? newName : (newName.endsWith('.wav') ? newName : newName + '.wav');
+        
+        // Rel path construction for rename
+        // The backend expects the logic to handle paths. 
+        // Currently voiceqwen_rename_file expects old_name and new_name (just filenames).
+        // I need to update the backend to handle relative paths for rename.
+
         $.post(voiceqwen_ajax.url, {
             action: 'voiceqwen_rename_file',
             nonce: voiceqwen_ajax.nonce,
-            old_name: oldName,
-            new_name: newName
+            old_name: oldRelPath, // Passing rel path
+            new_name: finalNewName
         }, function (response) {
             if (response.success) {
                 loadFileList();
@@ -549,10 +833,7 @@ jQuery(document).ready(function ($) {
         `);
     }
 
-    // Initial load
-    loadFileList();
-    loadVoices();
-    checkBackgroundStatus(); 
+
 
     // Audio Analysis Logic
     $('#run-analysis-btn').on('click', function() {
@@ -695,10 +976,252 @@ jQuery(document).ready(function ($) {
         });
     });
 
+    // WaveSurfer Logic
+    function loadWaveform(url, filename) {
+        $('#wave-viewer-empty').addClass('hidden');
+        $('#wave-viewer-container').addClass('hidden');
+        $('#wave-viewer-loading').removeClass('hidden');
+        $('#waveform-title').text(filename);
+        $('#wave-save').addClass('hidden'); // Reset save button
+
+        if (wavesurfer) {
+            wavesurfer.destroy();
+        }
+
+        // Initialize Regions Plugin
+        wsRegions = WaveSurfer.Regions.create();
+
+        wavesurfer = WaveSurfer.create({
+            container: '#waveform',
+            waveColor: '#00ffff',
+            progressColor: '#ff00ff',
+            cursorColor: '#ffffff',
+            cursorWidth: 2,
+            barWidth: 2,
+            barRadius: 3,
+            height: 150,
+            hideScrollbar: true,
+            normalize: true,
+            interact: true,
+            fillParent: true,
+            plugins: [wsRegions]
+        });
+
+        // Enable region selection on drag
+        wsRegions.enableDragSelection({
+            color: 'rgba(255, 0, 255, 0.2)',
+        });
+
+        // Floating Delete Button Logic
+        let $deleteBtn = $('#wave-region-delete');
+        if ($deleteBtn.length === 0) {
+            $deleteBtn = $('<button id="wave-region-delete" class="vapor-floating-btn hidden">DELETE</button>');
+            $('#waveform').css('position', 'relative').append($deleteBtn);
+        }
+
+        wsRegions.on('region-created', (region) => {
+            // Clear other regions if needed (only one selection)
+            wsRegions.getRegions().forEach(r => {
+                if (r !== region) r.remove();
+            });
+        });
+
+        wsRegions.on('region-updated', (region) => {
+            const container = wavesurfer.getWrapper();
+            const width = container.clientWidth;
+            
+            // Calculate relative position within the container
+            const startX = (region.start / wavesurfer.getDuration()) * width;
+            const endX = (region.end / wavesurfer.getDuration()) * width;
+            const centerX = (startX + endX) / 2;
+
+            $deleteBtn.removeClass('hidden').css({
+                top: '10px', // Fixed distance from top of waveform
+                left: centerX + 'px',
+                transform: 'translateX(-50%)',
+                position: 'absolute'
+            }).off('click').on('click', function(e) {
+                e.stopPropagation();
+                deleteSegment(region.start, region.end);
+                region.remove();
+                $deleteBtn.addClass('hidden');
+            });
+        });
+
+        // Hide delete button when clicking elsewhere
+        wavesurfer.on('interaction', () => {
+             $deleteBtn.addClass('hidden');
+             wsRegions.clearRegions();
+        });
+
+        wavesurfer.on('ready', function() {
+            $('#wave-viewer-loading').addClass('hidden');
+            $('#wave-viewer-container').removeClass('hidden');
+        });
+
+        wavesurfer.on('error', function(err) {
+            alert('Error cargando la onda: ' + err);
+            $('#wave-viewer-loading').addClass('hidden');
+            $('#wave-viewer-empty').removeClass('hidden');
+        });
+
+        // Add a "click to seek" behavior which is default but making sure it works
+        wavesurfer.load(url);
+    }
+
+    $(document).on('click', '#wave-play', function() {
+        if (wavesurfer) wavesurfer.play();
+    });
+
+    $(document).on('click', '#wave-pause', function() {
+        if (wavesurfer) wavesurfer.pause();
+    });
+
+    $(document).on('click', '#wave-stop', function() {
+        if (wavesurfer) {
+            wavesurfer.stop();
+        }
+    });
+
+    $(document).on('click', '#wave-save', function() {
+        if (!wavesurfer) return;
+        const buffer = wavesurfer.getDecodedData();
+        if (!buffer) return;
+
+        const wavBlob = audioBufferToWav(buffer);
+        const formData = new FormData();
+        formData.append('action', 'voiceqwen_save_edited_audio');
+        formData.append('nonce', voiceqwen_ajax.nonce);
+        formData.append('filename', activeFileName);
+        formData.append('audio', wavBlob, activeFileName);
+
+        const $btn = $(this);
+        $btn.prop('disabled', true).text('SAVING...');
+
+        $.ajax({
+            url: voiceqwen_ajax.url,
+            type: 'POST',
+            data: formData,
+            processData: false,
+            contentType: false,
+            success: function(response) {
+                if (response.success) {
+                    alert('¡Cambios guardados con éxito!');
+                    $btn.addClass('hidden');
+                } else {
+                    alert('Error al guardar: ' + response.data);
+                }
+                $btn.prop('disabled', false).text('SAVE EDITS');
+            },
+            error: function() {
+                alert('Error de red al guardar.');
+                $btn.prop('disabled', false).text('SAVE EDITS');
+            }
+        });
+    });
+
+    function deleteSegment(start, end) {
+        const originalBuffer = wavesurfer.getDecodedData();
+        const frameStart = Math.floor(start * originalBuffer.sampleRate);
+        const frameEnd = Math.floor(end * originalBuffer.sampleRate);
+        const frameCount = originalBuffer.length - (frameEnd - frameStart);
+
+        const newBuffer = new AudioContext().createBuffer(
+            originalBuffer.numberOfChannels,
+            frameCount,
+            originalBuffer.sampleRate
+        );
+
+        for (let i = 0; i < originalBuffer.numberOfChannels; i++) {
+            const chanData = originalBuffer.getChannelData(i);
+            const newChanData = newBuffer.getChannelData(i);
+            
+            // Copy part 1 (before deletion)
+            newChanData.set(chanData.subarray(0, frameStart));
+            // Copy part 2 (after deletion)
+            newChanData.set(chanData.subarray(frameEnd), frameStart);
+        }
+
+        // Update WaveSurfer with the new buffer (v7 style)
+        const blob = audioBufferToWav(newBuffer);
+        const url = URL.createObjectURL(blob);
+        
+        // Use the active filename as fallback if needed for metadata
+        wavesurfer.load(url);
+        $('#wave-save').removeClass('hidden'); // Show save button after edit
+    }
+
+    // Helper: AudioBuffer to WAV Blob
+    function audioBufferToWav(buffer) {
+        let numOfChan = buffer.numberOfChannels,
+            length = buffer.length * numOfChan * 2 + 44,
+            bufferArr = new ArrayBuffer(length),
+            view = new DataView(bufferArr),
+            channels = [], i, sample,
+            offset = 0,
+            pos = 0;
+
+        function setUint16(data) {
+            view.setUint16(pos, data, true);
+            pos += 2;
+        }
+
+        function setUint32(data) {
+            view.setUint32(pos, data, true);
+            pos += 4;
+        }
+
+        // write WAVE header
+        setUint32(0x46464952);                         // "RIFF"
+        setUint32(length - 8);                         // file length - 8
+        setUint32(0x45564157);                         // "WAVE"
+
+        setUint32(0x20746d66);                         // "fmt " chunk
+        setUint32(16);                                 // length = 16
+        setUint16(1);                                  // PCM (uncompressed)
+        setUint16(numOfChan);
+        setUint32(buffer.sampleRate);
+        setUint32(buffer.sampleRate * 2 * numOfChan);  // avg. bytes/sec
+        setUint16(numOfChan * 2);                      // block-align
+        setUint16(16);                                 // 16-bit
+
+        setUint32(0x61746164);                         // "data" - chunk
+        setUint32(length - pos - 4);                   // chunk length
+
+        // write interleaved data
+        for(i = 0; i < buffer.numberOfChannels; i++)
+            channels.push(buffer.getChannelData(i));
+
+        while(pos < length) {
+            for(i = 0; i < numOfChan; i++) {             // interleave channels
+                sample = Math.max(-1, Math.min(1, channels[i][offset])); // clamp
+                sample = (sample < 0 ? sample * 0x8000 : sample * 0x7FFF); // scale to 16-bit signed int
+                view.setInt16(pos, sample, true);          // write 16-bit sample
+                pos += 2;
+            }
+            offset++;
+        }
+
+        return new Blob([bufferArr], {type: "audio/wav"});
+    }
+
+    // Added Stability Slider UI Handlers
+    $(document).on('input', '#tts-stability', function() {
+        $('#stability-val').text($(this).val());
+    });
+    $(document).on('input', '#dialogue-stability', function() {
+        $('#dialogue-stability-val').text($(this).val());
+    });
+
     $(document).on('click', '.nav-btn-back', function() {
         const view = $(this).data('view');
         $('.view-pane').addClass('hidden');
         $(`#view-${view}`).removeClass('hidden');
     });
+
+    // Consolidated Initial Load
+    loadVoices();
+    loadFileList();
+    checkBackgroundStatus();
 });
 

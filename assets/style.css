@@ -460,3 +460,175 @@ html {
     font-weight: bold;
 }
 
+/* Waveform Viewer Extras */
+.file-item.active-file {
+    background: #0000ff !important;
+    color: #fff !important;
+    border-bottom-style: solid;
+}
+
+.file-item.active-file .file-name {
+    color: #fff !important;
+}
+
+#view-waveform .vapor-pane {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    min-height: 480px;
+}
+
+#wave-viewer-empty, #wave-viewer-loading, #wave-viewer-container {
+    min-height: 380px;
+}
+
+#waveform {
+    cursor: pointer;
+    box-shadow: inset 0 0 10px #000;
+    min-height: 150px;
+}
+
+#wave-controls .nav-btn:hover {
+    background: #ff00ff;
+    color: #fff;
+    border-color: #000;
+}
+
+/* Floating Delete Button */
+.vapor-floating-btn {
+    position: absolute;
+    z-index: 9999;
+    background: #ff0055;
+    color: #fff;
+    border: 2px solid #000;
+    font-weight: bold;
+    padding: 5px 15px;
+    cursor: pointer;
+    box-shadow: 4px 4px 0 #000;
+    font-family: inherit;
+    font-size: 14px;
+}
+
+.vapor-floating-btn:hover {
+    background: #ff0000;
+    transform: translate(-2px, -2px);
+    box-shadow: 6px 6px 0 #000;
+}
+
+.vapor-floating-btn:active {
+    transform: translate(0, 0);
+    box-shadow: 2px 2px 0 #000;
+}
+
+/* Tree View and Folders */
+.folder-item-row {
+    cursor: pointer;
+    font-weight: bold;
+    color: #4b0082;
+    padding: 5px;
+    border: 1px solid transparent;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(75, 0, 130, 0.05);
+    margin: 2px 0;
+    transition: background 0.2s;
+    position: relative;
+}
+
+.folder-item-row:hover {
+    background: rgba(75, 0, 130, 0.1);
+}
+
+.folder-icon:before {
+    content: '📁';
+    font-size: 14px;
+}
+
+.expanded .folder-icon:before {
+    content: '📂';
+}
+
+.folder-children {
+    padding-left: 15px;
+    border-left: 1px dashed #4b0082;
+    margin-left: 10px;
+}
+
+.folder-children.hidden {
+    display: none;
+}
+
+.file-item {
+    cursor: grab;
+    transition: transform 0.1s;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 5px;
+}
+
+.file-item:active {
+    cursor: grabbing;
+}
+
+/* Drag and Drop States */
+.is-dragging {
+    opacity: 0.4;
+    border: 2px dashed #ff00ff !important;
+}
+
+.drop-hover {
+    background: rgba(255, 0, 255, 0.2) !important;
+    outline: 2px solid #ff00ff;
+}
+
+.root-drop-zone {
+    height: 15px;
+    margin: 5px 0;
+    border: 1px dashed rgba(0,0,255,0.2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    color: rgba(0,0,255,0.5);
+    transition: all 0.2s;
+}
+
+.root-drop-zone.drop-hover {
+    border-color: #ff00ff;
+    background: rgba(255,0,255,0.05);
+    color: #ff00ff;
+    height: 25px;
+}
+
+/* Reorder Indicators */
+.drag-over-top {
+    border-top: 4px solid #ff00ff !important;
+}
+
+.drag-over-bottom {
+    border-bottom: 4px solid #ff00ff !important;
+}
+
+.folder-item-back {
+    cursor: pointer;
+    padding: 10px;
+    background: rgba(0, 0, 255, 0.1);
+    border-bottom: 2px solid #000;
+    font-weight: bold;
+    margin-bottom: 8px;
+    color: #4b0082;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 12px;
+    text-transform: uppercase;
+}
+
+.folder-item-back:hover {
+    background: rgba(0, 0, 255, 0.2);
+    color: #ff00ff;
+    padding-left: 15px;
+}

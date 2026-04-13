@@ -42,6 +42,8 @@ function voiceqwen_enqueue_assets() {
         'url' => admin_url( 'admin-ajax.php' ),
         'nonce' => wp_create_nonce( 'voiceqwen_nonce' )
     ) );
+    wp_enqueue_script( 'wavesurfer', 'https://unpkg.com/wavesurfer.js@7', array(), null, true );
+    wp_enqueue_script( 'wavesurfer-regions', 'https://unpkg.com/wavesurfer.js@7/dist/plugins/regions.min.js', array( 'wavesurfer' ), null, true );
 }
 add_action( 'wp_enqueue_scripts', 'voiceqwen_enqueue_assets' );
 
@@ -94,6 +96,7 @@ function voiceqwen_ui_shortcode() {
             <div class="vapor-nav">
                 <button class="nav-btn active" data-view="create">CREATE AUDIO</button>
                 <button class="nav-btn" data-view="dialogues">DIALOGUES</button>
+                <button class="nav-btn" data-view="waveform">WAVE VIEWER</button>
                 <button class="nav-btn" data-view="upload-voice">UPLOAD VOICE</button>
             </div>
         </div>
@@ -101,12 +104,15 @@ function voiceqwen_ui_shortcode() {
         <div class="vapor-body">
             <!-- Sidebar: File Viewer -->
             <div class="vapor-window sidebar">
-                <div class="vapor-window-header">
-                    <div class="vapor-dots"><span></span><span></span><span></span></div>
-                    <div class="vapor-window-title">Mis Archivos</div>
-                </div>
-                <div class="sidebar-controls" style="padding: 10px; border-bottom: 2px solid #0000ff; background: rgba(0,0,255,0.05);">
-                    <button id="frontend-analyze-btn" class="nav-btn" style="width: 100%; margin: 0; padding: 5px;">ANALYZE FILES</button>
+                <div class="vapor-window-header" style="display: flex; justify-content: space-between; align-items: center; padding-right: 10px;">
+                    <div style="display: flex; align-items: center;">
+                        <div class="vapor-dots"><span></span><span></span><span></span></div>
+                        <div class="vapor-window-title">Mis Archivos</div>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 5px;">
+                        <button id="sidebar-new-folder-btn" class="nav-btn" style="background:#fff; border:2px solid #000; color:#000; padding: 2px 8px; font-size: 10px; height: 18px; line-height: 1;" title="Nueva Carpeta">📁+</button>
+                        <button id="frontend-analyze-btn" class="nav-btn" style="width: auto; margin: 0; padding: 2px 8px; font-size: 10px; height: 18px; line-height: 1;">ANALYZE</button>
+                    </div>
                 </div>
                 <ul id="file-list" class="vapor-list">
                     <li class="loading">Cargando...</li>
@@ -139,6 +145,15 @@ function voiceqwen_ui_shortcode() {
                     <div class="upload-box">
                         <label for="tts-file">Seleccionar archivo .txt:</label>
                         <input type="file" id="tts-file" accept=".txt">
+                    </div>
+                </div>
+
+                <div class="stability-control" style="margin: 15px 0; padding: 10px; background: rgba(255,0,255,0.05); border: 1px solid #ff00ff;">
+                    <label style="display: block; font-weight: bold; margin-bottom: 5px; color: #ff00ff;">ESTABILIDAD VOCAL (TIMBRE): <span id="stability-val">0.7</span></label>
+                    <input type="range" id="tts-stability" min="0.1" max="1.0" step="0.1" value="0.7" style="width: 100%; cursor: pointer;">
+                    <div style="display: flex; justify-content: space-between; font-size: 11px; margin-top: 5px;">
+                        <span>EXPRESIVO</span>
+                        <span>ESTABLE (RECOMENDADO)</span>
                     </div>
                 </div>
 
@@ -195,11 +210,36 @@ function voiceqwen_ui_shortcode() {
                 </div>
                 
                 <div class="vapor-pane">
-                    <div style="background: rgba(0,0,255,0.05); padding: 10px; border: 1px dashed #0000ff; margin-bottom: 10px; font-size: 14px;">
-                        <strong>Cómo usar:</strong> Envuelve cada diálogo con etiquetas como <code>[Fernando]Hola![/Fernando]</code>. 
-                        Los nombres deben coincidir con los personajes creados.
+                    <!-- Dialogue Help Container -->
+                    <div class="vapor-window help-box" style="margin-bottom: 20px; border-style: dashed; background: rgba(0,0,255,0.02);">
+                        <div class="vapor-window-header" style="height: 30px; padding: 5px 10px; background: rgba(0,0,255,0.1); border-bottom: 1px dashed #0000ff;">
+                            <div class="vapor-window-title" style="font-size: 14px;">📖 GUÍA DE DIÁLOGOS</div>
+                        </div>
+                        <div style="padding: 15px; font-size: 16px; line-height: 1.4;">
+                            <div style="margin-bottom: 10px;">
+                                <strong>FORMATO:</strong> Envuelve cada fragmento con el nombre del personaje. 
+                                <br><code style="background: #fff; border: 1px solid #0000ff; padding: 2px 5px; font-size: 14px;">[Nombre]Texto del diálogo...[/Nombre]</code>
+                            </div>
+                            <div style="margin-bottom: 15px;">
+                                <strong>TIP:</strong> Puedes hacer clic en los nombres de abajo para insertar la etiqueta automáticamente.
+                            </div>
+                            <div id="dialogue-voice-chips" style="display: flex; flex-wrap: wrap; gap: 8px;">
+                                <!-- Cargado dinámicamente -->
+                                <span style="opacity: 0.5;">Cargando personajes disponibles...</span>
+                            </div>
+                        </div>
                     </div>
-                    <textarea id="dialogue-text" placeholder="[Fernando]Hola Mary Rose, ¿cómo estás?[/Fernando] [Mary Rose]¡Muy bien Fernando! ¿Y tú?[/Mary Rose]" style="height: 200px;"></textarea>
+                    
+                    <textarea id="dialogue-text" placeholder="[Fernando]Hola Alodia, ¿cómo estás?[/Fernando] [Alodia Corral]¡Muy bien Fernando! Estamos al aire...[/Alodia Corral]" style="height: 200px;"></textarea>
+                    
+                    <div class="stability-control" style="margin: 15px 0; padding: 10px; background: rgba(255,0,255,0.05); border: 1px solid #ff00ff;">
+                        <label style="display: block; font-weight: bold; margin-bottom: 5px; color: #ff00ff;">ESTABILIDAD VOCAL (TIMBRE): <span id="dialogue-stability-val">0.7</span></label>
+                        <input type="range" id="dialogue-stability" min="0.1" max="1.0" step="0.1" value="0.7" style="width: 100%; cursor: pointer;">
+                        <div style="display: flex; justify-content: space-between; font-size: 11px; margin-top: 5px;">
+                            <span>EXPRESIVO</span>
+                            <span>ESTABLE</span>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="controls">
@@ -246,6 +286,34 @@ function voiceqwen_ui_shortcode() {
                 </div>
             </div>
 
+            <!-- View 5: Waveform Viewer -->
+            <div class="vapor-window main view-pane hidden" id="view-waveform">
+                <div class="vapor-window-header">
+                    <div class="vapor-dots"><span></span><span></span><span></span></div>
+                    <div class="vapor-window-title">WAVEFORM VISUALIZER</div>
+                </div>
+                <div class="vapor-pane">
+                    <div id="wave-viewer-empty" style="text-align: center; padding: 50px; color: #0000ff; border: 2px dashed #0000ff; background: rgba(0,0,255,0.05);">
+                        <div style="font-size: 40px; margin-bottom: 10px;">📡</div>
+                        Selecciona un archivo del panel izquierdo para visualizar su frecuencia.
+                    </div>
+                    <div id="wave-viewer-loading" class="hidden" style="text-align: center; padding: 50px; color: #ff00ff;">
+                        <div class="vapor-dots" style="justify-content: center; margin-bottom: 10px;"><span></span><span></span><span></span></div>
+                        CALCULANDO ONDAS...
+                    </div>
+                    <div id="wave-viewer-container" class="hidden">
+                        <div id="waveform-title" style="margin-bottom: 10px; font-weight: bold; color: #ff00ff; font-size: 20px;"></div>
+                        <div id="waveform" style="background: #0d0d2b; border: 3px solid #0000ff; margin-bottom: 15px;"></div>
+                        <div id="wave-controls" style="display: flex; gap: 15px; align-items: center; justify-content: center; padding: 10px; background: rgba(0,0,255,0.05); border: 2px solid #0000ff;">
+                            <button id="wave-play" type="button" class="nav-btn wave-control-btn" style="width: auto; margin: 0; min-width: 80px;">PLAY</button>
+                            <button id="wave-pause" type="button" class="nav-btn wave-control-btn" style="width: auto; margin: 0; min-width: 80px;">PAUSE</button>
+                            <button id="wave-stop" type="button" class="nav-btn wave-control-btn" style="width: auto; margin: 0; min-width: 80px; background: #888; color: #fff;">STOP</button>
+                            <button id="wave-save" type="button" class="nav-btn hidden" style="width: auto; margin: 0; background: #00ffff; color: #000; font-weight: bold; border: 2px solid #000;">SAVE EDITS</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
         </div>
         <div class="vapor-deco-text">90's</div>
 
@@ -269,8 +337,16 @@ function voiceqwen_reset_status() {
     $status_file = $user_dir . '/status.json';
 
     if ( file_exists( $status_file ) ) {
+        // Also cleanup chunks if we are forcing a reset
+        $data = json_decode( file_get_contents( $status_file ), true );
+        if ( isset( $data['filename'] ) ) {
+            $chunks_dir = $user_dir . '/' . $data['filename'] . '.chunks';
+            if ( file_exists( $chunks_dir ) ) {
+                voiceqwen_recursive_delete( $chunks_dir );
+            }
+        }
         unlink( $status_file );
-        wp_send_json_success( 'Estado reiniciado y desbloqueado' );
+        wp_send_json_success( 'Estado y fragmentos temporales reiniciados' );
     } else {
         wp_send_json_error( 'No hay proceso activo' );
     }
@@ -314,9 +390,30 @@ function voiceqwen_generate_audio() {
     }
 
     $voice = sanitize_text_field( $_POST['voice'] );
+    $stability = isset( $_POST['stability'] ) ? floatval( $_POST['stability'] ) : 0.7;
 
     if ( empty( $text ) ) {
         wp_send_json_error( 'El texto está vacío.' );
+    }
+
+    // Helper to calculate total fragments (sync logic with Python)
+    $text_clean = str_replace("\n", " ", $text);
+    $sentences = preg_split('/(?<=[.!?])\s+/', $text_clean, -1, PREG_SPLIT_NO_EMPTY);
+    $total_frags = 1;
+    if (!empty($sentences)) {
+        $max_words = 15;
+        $current_chunk_words = 0;
+        $frag_count = 0;
+        foreach ($sentences as $s) {
+            $word_count = count(explode(' ', trim($s)));
+            if ($current_chunk_words + $word_count <= $max_words || $current_chunk_words == 0) {
+                $current_chunk_words += $word_count;
+            } else {
+                $frag_count++;
+                $current_chunk_words = $word_count;
+            }
+        }
+        $total_frags = $frag_count + 1;
     }
 
     $upload_dir = wp_upload_dir();
@@ -329,7 +426,9 @@ function voiceqwen_generate_audio() {
         wp_send_json_error( 'YA HAY UN PROCESO EN CURSO. Por favor espera a que termine o usa "CANCELAR / RESET" para limpiar el estado.' );
     }
 
-    $filename = 'tts_' . time() . '_' . $voice . '.wav';
+    // Deterministic filename based on text hash to allow resumption
+    $text_hash = md5( $text . $voice );
+    $filename = 'tts_' . $text_hash . '.wav';
     $output_path = $user_dir . '/' . $filename;
     $log_path = $user_dir . '/last_job.log';
 
@@ -341,24 +440,34 @@ function voiceqwen_generate_audio() {
     
     $status_file = $user_dir . '/status.json';
     $cmd = sprintf(
-        '%s %s --text %s --voice %s --output %s --status_file %s',
+        '%s %s --text %s --voice %s --stability %s --output %s --status_file %s',
         escapeshellarg( $python_path ),
         escapeshellarg( $script_path ),
         escapeshellarg( $text ),
         escapeshellarg( $voice ),
+        escapeshellarg( $stability ),
         escapeshellarg( $output_path ),
         escapeshellarg( $status_file )
     );
 
     // Write status file to track background job
-    file_put_contents( $status_file, json_encode( array( 'status' => 'processing', 'filename' => $filename, 'time' => time() ) ) );
+    file_put_contents( $status_file, json_encode( array( 
+        'status'   => 'processing', 
+        'filename' => $filename, 
+        'time'     => time(),
+        'current'  => 1,
+        'total'    => $total_frags,
+        'message'  => 'Iniciando sistema y cargando modelo (esto puede tardar 1 min)...'
+    ) ) );
 
     // Build the background job script
     $script_lines = array(
         '#!/bin/bash',
+        'export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"',
         'export PYTHONIOENCODING=utf-8',
-        sprintf( '%s > %s 2>&1', $cmd, escapeshellarg( $log_path ) ),
-        'rm -f ' . escapeshellarg( $status_file )
+        'export TORCH_NUM_THREADS=4',
+        sprintf( '%s > %s 2>&1', $cmd, escapeshellarg( $log_path ) )
+        // status.json managed by Python script
     );
     
     $job_script = $user_dir . '/run_job.sh';
@@ -399,8 +508,29 @@ function voiceqwen_generate_dialogue() {
     $username = $current_user->user_login;
 
     $text = sanitize_textarea_field( $_POST['text'] );
+    $stability = isset( $_POST['stability'] ) ? floatval( $_POST['stability'] ) : 0.7;
     if ( empty( $text ) ) {
         wp_send_json_error( 'El texto está vacío.' );
+    }
+
+    // Helper to calculate total fragments (sync logic with Python)
+    $text_clean = str_replace("\n", " ", $text);
+    $sentences = preg_split('/(?<=[.!?])\s+/', $text_clean, -1, PREG_SPLIT_NO_EMPTY);
+    $total_frags = 1;
+    if (!empty($sentences)) {
+        $max_words = 15;
+        $current_chunk_words = 0;
+        $frag_count = 0;
+        foreach ($sentences as $s) {
+            $word_count = count(explode(' ', trim($s)));
+            if ($current_chunk_words + $word_count <= $max_words || $current_chunk_words == 0) {
+                $current_chunk_words += $word_count;
+            } else {
+                $frag_count++;
+                $current_chunk_words = $word_count;
+            }
+        }
+        $total_frags = $frag_count + 1;
     }
 
     $upload_dir = wp_upload_dir();
@@ -413,7 +543,8 @@ function voiceqwen_generate_dialogue() {
         wp_send_json_error( 'YA HAY UN PROCESO EN CURSO. Por favor espera a que termine o usa "CANCELAR / RESET" para limpiar el estado.' );
     }
 
-    $filename = 'dialogue_' . time() . '.wav';
+    $text_hash = md5( $text );
+    $filename = 'dialogue_' . $text_hash . '.wav';
     $output_path = $user_dir . '/' . $filename;
     $log_path = $user_dir . '/last_job.log';
 
@@ -423,22 +554,32 @@ function voiceqwen_generate_dialogue() {
     $script_path = plugin_dir_path( __FILE__ ) . 'tts_dialogue.py';
     
     $status_file = $user_dir . '/status.json';
+    file_put_contents( $status_file, json_encode( array( 
+        'status'   => 'processing', 
+        'filename' => $filename, 
+        'time'     => time(),
+        'current'  => 1,
+        'total'    => $total_frags,
+        'message'  => 'Iniciando sistema y preparando diálogo...'
+    ) ) );
+
     $cmd = sprintf(
-        '%s %s --text %s --output %s --status_file %s',
+        '%s %s --text %s --stability %s --output %s --status_file %s',
         escapeshellarg( $python_path ),
         escapeshellarg( $script_path ),
         escapeshellarg( $text ),
+        escapeshellarg( $stability ),
         escapeshellarg( $output_path ),
         escapeshellarg( $status_file )
     );
 
-    file_put_contents( $status_file, json_encode( array( 'status' => 'processing', 'filename' => $filename, 'time' => time() ) ) );
-
     $script_lines = array(
         '#!/bin/bash',
+        'export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"',
         'export PYTHONIOENCODING=utf-8',
-        sprintf( '%s > %s 2>&1', $cmd, escapeshellarg( $log_path ) ),
-        'rm -f ' . escapeshellarg( $status_file )
+        'export TORCH_NUM_THREADS=4',
+        sprintf( '%s > %s 2>&1', $cmd, escapeshellarg( $log_path ) )
+        // status.json managed by Python script
     );
     
     $job_script = $user_dir . '/run_job.sh';
@@ -478,17 +619,17 @@ function voiceqwen_check_status() {
     if ( file_exists( $status_file ) ) {
         $status_data = json_decode( file_get_contents( $status_file ), true );
         
-        // Fallback: If the expected output file already exists, the job might have finished but failed to delete status.json
-        if ( isset( $status_data['filename'] ) && file_exists( $user_dir . '/' . $status_data['filename'] ) ) {
-            unlink( $status_file );
-            wp_send_json_success( array( 'status' => 'idle' ) );
-            return;
-        }
-
+        $is_completed = ( isset( $status_data['status'] ) && $status_data['status'] === 'completed' );
+        
         wp_send_json_success( array( 
-            'status' => $status_data['status'] === 'completed' ? 'completed' : 'processing', 
+            'status'  => $is_completed ? 'completed' : 'processing', 
             'details' => $status_data 
         ) );
+
+        // If completed, we could unlink but maybe wait for one last poll from frontend
+        if ( $is_completed ) {
+            // unlink( $status_file ); 
+        }
     } else {
         wp_send_json_success( array( 'status' => 'idle' ) );
     }
@@ -503,45 +644,131 @@ function voiceqwen_rename_file() {
     
     if ( ! is_user_logged_in() ) wp_send_json_error();
 
-    $old_name = sanitize_file_name( $_POST['old_name'] );
+    $old_rel = sanitize_text_field( $_POST['old_name'] ); // Actually a relative path now
     $new_name = sanitize_file_name( $_POST['new_name'] );
 
-    if ( empty( $old_name ) || empty( $new_name ) ) wp_send_json_error( 'Nombres inválidos' );
-
-    // Ensure .wav extension
-    if ( substr( strtolower( $new_name ), -4 ) !== '.wav' ) {
-        $new_name .= '.wav';
-    }
+    if ( empty( $old_rel ) || empty( $new_name ) ) wp_send_json_error( 'Nombres inválidos' );
 
     $current_user = wp_get_current_user();
     $username = $current_user->user_login;
     $upload_dir = wp_upload_dir();
     $user_dir = $upload_dir['basedir'] . '/voiceqwen/' . $username;
-    
-    $old_path = $user_dir . '/' . $old_name;
-    $new_path = $user_dir . '/' . $new_name;
 
-    if ( file_exists( $old_path ) && ! file_exists( $new_path ) && str_contains( $old_name, '..' ) === false ) {
+    // Security
+    if ( str_contains( $old_rel, '..' ) || str_contains( $new_name, '..' ) ) {
+        wp_send_json_error( 'Acceso denegado' );
+    }
+
+    $old_path = $user_dir . '/' . $old_rel;
+    
+    // Construct new path: same directory as old path, but new filename
+    $dir = dirname( $old_path );
+    
+    // Ensure extension for files
+    if ( ! is_dir( $old_path ) && ! str_ends_with( strtolower( $new_name ), '.wav' ) ) {
+        $new_name .= '.wav';
+    }
+    
+    $new_path = $dir . '/' . $new_name;
+
+    if ( file_exists( $old_path ) && ! file_exists( $new_path ) ) {
         if ( rename( $old_path, $new_path ) ) {
             wp_send_json_success( 'Renombrado correctamente' );
         } else {
             wp_send_json_error( 'Error al renombrar' );
         }
     } else {
-        wp_send_json_error( 'El archivo no existe o el nombre nuevo ya está en uso' );
+        wp_send_json_error( 'El origen no existe o el destino ya existe' );
     }
 }
 add_action( 'wp_ajax_voiceqwen_rename_file', 'voiceqwen_rename_file' );
 
 /**
- * AJAX: List user files.
+ * Recursive File Listing
  */
+function voiceqwen_get_file_tree( $dir, $base_url, $relative_path = '' ) {
+    $tree = array();
+    if ( ! file_exists( $dir ) || ! is_dir( $dir ) ) return $tree;
+    
+    $items = scandir( $dir );
+
+    $order_file = $dir . '/.order.json';
+    $order = array();
+    if ( file_exists( $order_file ) ) {
+        $order = json_decode( file_get_contents( $order_file ), true );
+    }
+
+    foreach ( $items as $item ) {
+        if ( $item === '.' || $item === '..' || str_starts_with( $item, '.' ) ) continue;
+
+        $path = $dir . DIRECTORY_SEPARATOR . $item;
+        $rel = $relative_path ? $relative_path . '/' . $item : $item;
+
+        if ( is_dir( $path ) ) {
+            $tree[] = array(
+                'type'     => 'folder',
+                'name'     => $item,
+                'rel_path' => $rel,
+                'children' => voiceqwen_get_file_tree( $path, $base_url, $rel )
+            );
+        } elseif ( str_ends_with( strtolower( $item ), '.wav' ) ) {
+            $tree[] = array(
+                'type'     => 'file',
+                'name'     => $item,
+                'rel_path' => $rel,
+                'url'      => $base_url . $rel
+            );
+        }
+    }
+
+    // Sort by custom order
+    if ( ! empty( $order ) ) {
+        usort( $tree, function( $a, $b ) use ( $order ) {
+            $idxA = array_search( $a['name'], $order );
+            $idxB = array_search( $b['name'], $order );
+            
+            if ( $idxA === false && $idxB === false ) return 0;
+            if ( $idxA === false ) return 1;
+            if ( $idxB === false ) return -1;
+            return $idxA - $idxB;
+        });
+    }
+
+    return $tree;
+}
+
+function voiceqwen_save_order() {
+    check_ajax_referer( 'voiceqwen_nonce', 'nonce' );
+    if ( ! is_user_logged_in() ) wp_send_json_error();
+
+    $rel_path = sanitize_text_field( $_POST['rel_path'] ); // Current folder rel path
+    $order = $_POST['order']; // Array of names
+
+    if ( ! is_array( $order ) ) wp_send_json_error( 'Invalid order format' );
+
+    $current_user = wp_get_current_user();
+    $username = $current_user->user_login;
+    $upload_dir = wp_upload_dir();
+    $user_dir = $upload_dir['basedir'] . '/voiceqwen/' . $username;
+
+    $target_dir = empty( $rel_path ) ? $user_dir : $user_dir . '/' . $rel_path;
+    
+    if ( ! file_exists( $target_dir ) ) {
+        wp_send_json_error( 'Directory not found' );
+    }
+
+    $order_file = $target_dir . '/.order.json';
+    if ( file_put_contents( $order_file, json_encode( $order ) ) ) {
+        wp_send_json_success();
+    } else {
+        wp_send_json_error( 'Failed to save order' );
+    }
+}
+add_action( 'wp_ajax_voiceqwen_save_order', 'voiceqwen_save_order' );
+
 function voiceqwen_list_files() {
     check_ajax_referer( 'voiceqwen_nonce', 'nonce' );
-
-    if ( ! is_user_logged_in() ) {
-        wp_send_json_error();
-    }
+    if ( ! is_user_logged_in() ) wp_send_json_error();
 
     $current_user = wp_get_current_user();
     $username = $current_user->user_login;
@@ -549,22 +776,83 @@ function voiceqwen_list_files() {
     $user_dir = $upload_dir['basedir'] . '/voiceqwen/' . $username;
     $base_url = $upload_dir['baseurl'] . '/voiceqwen/' . $username . '/';
 
-    $files = array();
-    if ( file_exists( $user_dir ) ) {
-        $scan = scandir( $user_dir );
-        foreach ( $scan as $file ) {
-            if ( str_contains( $file, '.wav' ) ) {
-                $files[] = array(
-                    'name' => $file,
-                    'url'  => $base_url . $file
-                );
-            }
-        }
+    if ( ! file_exists( $user_dir ) ) {
+        mkdir( $user_dir, 0755, true );
     }
     
-    wp_send_json_success( $files );
+    $tree = voiceqwen_get_file_tree( $user_dir, $base_url );
+    wp_send_json_success( $tree );
 }
 add_action( 'wp_ajax_voiceqwen_list_files', 'voiceqwen_list_files' );
+
+/**
+ * AJAX: Create Folder
+ */
+function voiceqwen_create_folder() {
+    check_ajax_referer( 'voiceqwen_nonce', 'nonce' );
+    if ( ! is_user_logged_in() ) wp_send_json_error();
+
+    $folder = sanitize_file_name( $_POST['folder'] );
+    if ( empty( $folder ) ) wp_send_json_error( 'Nombre inválido' );
+
+    $current_user = wp_get_current_user();
+    $username = $current_user->user_login;
+    $upload_dir = wp_upload_dir();
+    $user_dir = $upload_dir['basedir'] . '/voiceqwen/' . $username;
+    $new_dir = $user_dir . '/' . $folder;
+
+    if ( ! file_exists( $new_dir ) ) {
+        if ( mkdir( $new_dir, 0755, true ) ) {
+            wp_send_json_success( 'Carpeta creada' );
+        } else {
+            wp_send_json_error( 'Error al crear carpeta' );
+        }
+    } else {
+        wp_send_json_error( 'Ya existe' );
+    }
+}
+add_action( 'wp_ajax_voiceqwen_create_folder', 'voiceqwen_create_folder' );
+
+/**
+ * AJAX: Move Item (File or Folder)
+ */
+function voiceqwen_move_item() {
+    check_ajax_referer( 'voiceqwen_nonce', 'nonce' );
+    if ( ! is_user_logged_in() ) wp_send_json_error();
+
+    $item_rel = sanitize_text_field( $_POST['item_rel'] );
+    $target_folder = sanitize_text_field( $_POST['target_folder'] ); // can be empty for root
+
+    $current_user = wp_get_current_user();
+    $username = $current_user->user_login;
+    $upload_dir = wp_upload_dir();
+    $user_dir = $upload_dir['basedir'] . '/voiceqwen/' . $username;
+
+    // Security check: no path traversal
+    if ( str_contains( $item_rel, '..' ) || str_contains( $target_folder, '..' ) ) {
+        wp_send_json_error( 'Acceso denegado' );
+    }
+
+    $source_path = $user_dir . '/' . $item_rel;
+    $filename = basename( $source_path );
+    
+    if ( empty( $target_folder ) ) {
+        $dest_path = $user_dir . '/' . $filename;
+    } else {
+        $dest_path = $user_dir . '/' . $target_folder . '/' . $filename;
+    }
+
+    if ( file_exists( $source_path ) ) {
+        if ( rename( $source_path, $dest_path ) ) {
+            wp_send_json_success( 'Movido correctamente' );
+        } else {
+            wp_send_json_error( 'Error al mover' );
+        }
+    } else {
+        wp_send_json_error( 'Archivo no encontrado' );
+    }
+}
+add_action( 'wp_ajax_voiceqwen_move_item', 'voiceqwen_move_item' );
 
 /**
  * AJAX: Delete file.
@@ -572,11 +860,9 @@ add_action( 'wp_ajax_voiceqwen_list_files', 'voiceqwen_list_files' );
 function voiceqwen_delete_file() {
     check_ajax_referer( 'voiceqwen_nonce', 'nonce' );
 
-    if ( ! is_user_logged_in() ) {
-        wp_send_json_error();
-    }
+    if ( ! is_user_logged_in() ) wp_send_json_error();
 
-    $filename = sanitize_text_field( $_POST['filename'] );
+    $filename = sanitize_text_field( $_POST['filename'] ); // Can be a relative path
     $current_user = wp_get_current_user();
     $username = $current_user->user_login;
     $upload_dir = wp_upload_dir();
@@ -584,11 +870,25 @@ function voiceqwen_delete_file() {
     $file_path = $user_dir . '/' . $filename;
 
     if ( file_exists( $file_path ) && str_contains( $filename, '..' ) === false ) {
-        unlink( $file_path );
-        wp_send_json_success();
+        if ( is_dir( $file_path ) ) {
+            voiceqwen_recursive_delete( $file_path );
+            wp_send_json_success( 'Carpeta eliminada' );
+        } else {
+            unlink( $file_path );
+            wp_send_json_success( 'Archivo eliminado' );
+        }
     } else {
-        wp_send_json_error( 'Archivo no encontrado.' );
+        wp_send_json_error( 'No se pudo encontrar el elemento' );
     }
+}
+
+function voiceqwen_recursive_delete($dir) {
+    if (!file_exists($dir)) return;
+    $files = array_diff(scandir($dir), array('.','..'));
+    foreach ($files as $file) {
+        (is_dir("$dir/$file")) ? voiceqwen_recursive_delete("$dir/$file") : unlink("$dir/$file");
+    }
+    return rmdir($dir);
 }
 add_action( 'wp_ajax_voiceqwen_delete_file', 'voiceqwen_delete_file' );
 
@@ -813,5 +1113,28 @@ function voiceqwen_analyze_audio() {
         'summary' => $summary
     ) );
 }
-add_action( 'wp_ajax_voiceqwen_analyze_audio', 'voiceqwen_analyze_audio' );
+
+/**
+ * AJAX Handler: Save edited audio Blob.
+ */
+function voiceqwen_save_edited_audio() {
+    check_ajax_referer( 'voiceqwen_nonce', 'nonce' );
+    if ( ! is_user_logged_in() || ! isset( $_FILES['audio'] ) ) wp_send_json_error( 'Navegador o usuario no autorizado' );
+
+    $filename = sanitize_file_name( $_POST['filename'] );
+    if ( empty( $filename ) ) wp_send_json_error( 'Nombre de archivo inválido' );
+
+    $current_user = wp_get_current_user();
+    $username = $current_user->user_login;
+    $upload_dir = wp_upload_dir();
+    $user_dir = $upload_dir['basedir'] . '/voiceqwen/' . $username;
+    $file_path = $user_dir . '/' . $filename;
+
+    if ( move_uploaded_file( $_FILES['audio']['tmp_name'], $file_path ) ) {
+        wp_send_json_success( 'Ediciones guardadas correctamente' );
+    } else {
+        wp_send_json_error( 'Error al guardar las ediciones' );
+    }
+}
+add_action( 'wp_ajax_voiceqwen_save_edited_audio', 'voiceqwen_save_edited_audio' );
 
