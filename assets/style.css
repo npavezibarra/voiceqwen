@@ -1,7 +1,8 @@
 @import url('https://fonts.googleapis.com/css2?family=VT323&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600&display=swap');
 
 /* Reset and basic setup */
-.vapor-grid-bg {
+.voiceqwen-theme-90ties .vapor-grid-bg {
     position: fixed;
     top: 0;
     left: 0;
@@ -16,40 +17,40 @@
 }
 
 /* Aggressive Layout Fixes to remove title and top spacing */
-header.entry-header,
-.entry-title,
-.post-title,
-.page-title,
-h1.entry-title,
-h1.wp-block-post-title,
-.site-header,
-.site-branding,
-.entry-header {
+.voiceqwen-theme-90ties header.entry-header,
+.voiceqwen-theme-90ties .entry-title,
+.voiceqwen-theme-90ties .post-title,
+.voiceqwen-theme-90ties .page-title,
+.voiceqwen-theme-90ties h1.entry-title,
+.voiceqwen-theme-90ties h1.wp-block-post-title,
+.voiceqwen-theme-90ties .site-header,
+.voiceqwen-theme-90ties .site-branding,
+.voiceqwen-theme-90ties .entry-header {
     display: none !important;
 }
 
 /* Remove all top spacing from theme containers */
-#content,
-.site-content,
-.entry-content,
-.content-area,
-#primary,
-main,
-article,
-div.wp-block-group.has-background {
+.voiceqwen-theme-90ties #content,
+.voiceqwen-theme-90ties .site-content,
+.voiceqwen-theme-90ties .entry-content,
+.voiceqwen-theme-90ties .content-area,
+.voiceqwen-theme-90ties #primary,
+.voiceqwen-theme-90ties main,
+.voiceqwen-theme-90ties article,
+.voiceqwen-theme-90ties div.wp-block-group.has-background {
     padding-top: 0 !important;
     margin-top: 0 !important;
     top: 0 !important;
 }
 
 /* Ensure the grid background is truly full-screen */
-body,
-html {
+.voiceqwen-theme-90ties body,
+.voiceqwen-theme-90ties html {
     margin: 0 !important;
     padding: 0 !important;
 }
 
-.vapor-container {
+.voiceqwen-theme-90ties .vapor-container {
     max-width: 1000px;
     margin: 0 auto;
     padding: 20px;
@@ -59,7 +60,7 @@ html {
 }
 
 /* Main Header */
-.vapor-header {
+.voiceqwen-theme-90ties .vapor-header {
     background: #0000ff;
     color: #fff;
     padding: 10px 20px;
@@ -70,13 +71,13 @@ html {
     box-shadow: 10px 10px 0px rgba(0, 0, 255, 0.2);
 }
 
-.vapor-dots {
+.voiceqwen-theme-90ties .vapor-dots {
     display: flex;
     gap: 5px;
     margin-right: 15px;
 }
 
-.vapor-dots span {
+.voiceqwen-theme-90ties .vapor-dots span {
     width: 8px;
     height: 8px;
     background: #fff;
@@ -84,18 +85,18 @@ html {
     border: 1px solid #000;
 }
 
-.vapor-title {
+.voiceqwen-theme-90ties .vapor-title {
     font-size: 24px;
     text-transform: lowercase;
 }
 
-.vapor-nav {
+.voiceqwen-theme-90ties .vapor-nav {
     margin-left: auto;
     display: flex;
     gap: 10px;
 }
 
-.nav-btn {
+.voiceqwen-theme-90ties .nav-btn {
     background: #fff;
     border: 2px solid #000;
     color: #000;
@@ -107,31 +108,31 @@ html {
     transition: all 0.1s;
 }
 
-.nav-btn.active {
+.voiceqwen-theme-90ties .nav-btn.active {
     background: #ff00ff;
     color: #fff;
     box-shadow: none;
     transform: translate(2px, 2px);
 }
 
-.nav-btn:hover:not(.active) {
+.voiceqwen-theme-90ties .nav-btn:hover:not(.active) {
     background: #ffeef2;
 }
 
 /* Forms */
-.form-group {
+.voiceqwen-theme-90ties .form-group {
     margin-bottom: 20px;
 }
 
-.form-group label {
+.voiceqwen-theme-90ties .form-group label {
     display: block;
     font-size: 20px;
     color: #0000ff;
     margin-bottom: 5px;
 }
 
-.form-group input[type="text"],
-.form-group textarea {
+.voiceqwen-theme-90ties .form-group input[type="text"],
+.voiceqwen-theme-90ties .form-group textarea {
     width: 100%;
     border: 3px solid #0000ff;
     padding: 8px;
@@ -139,12 +140,12 @@ html {
     font-size: 18px;
 }
 
-.form-group input[type="file"] {
+.voiceqwen-theme-90ties .form-group input[type="file"] {
     font-family: 'VT323', monospace;
     font-size: 16px;
 }
 
-.form-group small {
+.voiceqwen-theme-90ties .form-group small {
     display: block;
     color: #888;
     font-size: 16px;
@@ -152,13 +153,14 @@ html {
 }
 
 /* Body and Windows */
-.vapor-body {
+.voiceqwen-theme-90ties .vapor-body {
     display: flex;
+    flex-direction: column-reverse;
     gap: 30px;
-    align-items: flex-start;
+    align-items: stretch;
 }
 
-.vapor-window {
+.voiceqwen-theme-90ties .vapor-window {
     background: #fff;
     border: 3px solid #0000ff;
     padding: 0;
@@ -166,15 +168,15 @@ html {
     box-shadow: 8px 8px 0px rgba(0, 0, 0, 0.1);
 }
 
-.vapor-window.sidebar {
-    width: 300px;
+.voiceqwen-theme-90ties .vapor-window.sidebar {
+    width: 100%;
 }
 
-.vapor-window.main {
-    flex: 1;
+.voiceqwen-theme-90ties .vapor-window.main {
+    width: 100%;
 }
 
-.vapor-window-header {
+.voiceqwen-theme-90ties .vapor-window-header {
     background: #fff;
     border-bottom: 3px solid #0000ff;
     padding: 8px 15px;
@@ -182,18 +184,18 @@ html {
     align-items: center;
 }
 
-.vapor-window-header .vapor-dots span {
+.voiceqwen-theme-90ties .vapor-window-header .vapor-dots span {
     background: #0000ff;
     border-color: #0000ff;
 }
 
-.vapor-window-title {
+.voiceqwen-theme-90ties .vapor-window-title {
     color: #0000ff;
     font-size: 20px;
 }
 
 /* List */
-.vapor-list {
+.voiceqwen-theme-90ties .vapor-list {
     list-style: none;
     margin: 0;
     padding: 10px;
@@ -201,7 +203,7 @@ html {
     overflow-y: auto;
 }
 
-.vapor-list li {
+.voiceqwen-theme-90ties .vapor-list li {
     padding: 8px;
     border-bottom: 2px dotted #0000ff;
     display: flex;
@@ -212,12 +214,12 @@ html {
     color: #000;
 }
 
-.vapor-list li:hover {
+.voiceqwen-theme-90ties .vapor-list li:hover {
     background: #ffeef2;
 }
 
-.vapor-list li .delete-btn,
-.trash-btn {
+.voiceqwen-theme-90ties .vapor-list li .delete-btn,
+.voiceqwen-theme-90ties .trash-btn {
     background: #fff;
     border: 2px solid #0000ff;
     color: #0000ff;
@@ -229,19 +231,19 @@ html {
     transition: all 0.1s;
 }
 
-.trash-btn:hover {
+.voiceqwen-theme-90ties .trash-btn:hover {
     background: #ff00ff;
     color: #fff;
     border-color: #ff00ff;
 }
 
 /* Tabs */
-.vapor-tabs {
+.voiceqwen-theme-90ties .vapor-tabs {
     display: flex;
     padding: 15px 15px 0;
 }
 
-.vapor-tab {
+.voiceqwen-theme-90ties .vapor-tab {
     background: #fff;
     border: 3px solid #0000ff;
     border-bottom: none;
@@ -253,17 +255,17 @@ html {
     color: #0000ff;
 }
 
-.vapor-tab.active {
+.voiceqwen-theme-90ties .vapor-tab.active {
     background: #0000ff;
     color: #fff;
 }
 
 /* Pane */
-.vapor-pane {
+.voiceqwen-theme-90ties .vapor-pane {
     padding: 15px;
 }
 
-#tts-text {
+.voiceqwen-theme-90ties #tts-text {
     width: 100%;
     height: 150px;
     border: 3px solid #0000ff;
@@ -274,12 +276,12 @@ html {
     color: #000;
 }
 
-#tts-text:focus {
+.voiceqwen-theme-90ties #tts-text:focus {
     outline: 2px solid #ff00ff;
 }
 
 /* Voice Selector (Avatars) */
-.voice-selector {
+.voiceqwen-theme-90ties .voice-selector {
     padding: 15px;
     display: flex;
     gap: 30px;
@@ -288,7 +290,7 @@ html {
     background: rgba(0, 0, 255, 0.05);
 }
 
-.avatar-radio {
+.voiceqwen-theme-90ties .avatar-radio {
     cursor: pointer;
     display: flex;
     flex-direction: column;
@@ -297,13 +299,13 @@ html {
     position: relative;
 }
 
-.avatar-radio input {
+.voiceqwen-theme-90ties .avatar-radio input {
     position: absolute;
     opacity: 0;
     cursor: pointer;
 }
 
-.avatar-circle {
+.voiceqwen-theme-90ties .avatar-circle {
     width: 70px;
     height: 70px;
     border-radius: 50%;
@@ -314,26 +316,26 @@ html {
     box-shadow: 4px 4px 0px rgba(0, 0, 0, 0.1);
 }
 
-.avatar-name {
+.voiceqwen-theme-90ties .avatar-name {
     font-family: 'VT323', monospace;
     font-size: 18px;
     color: #0000ff;
 }
 
 /* Selected state */
-.avatar-radio input:checked+.avatar-circle {
+.voiceqwen-theme-90ties .avatar-radio input:checked+.avatar-circle {
     border-color: #ff00ff;
     box-shadow: 0 0 15px #ff00ff;
     transform: scale(1.1);
 }
 
-.avatar-radio input:checked~.avatar-name {
+.voiceqwen-theme-90ties .avatar-radio input:checked~.avatar-name {
     color: #ff00ff;
     font-weight: bold;
 }
 
 /* Main Button */
-.vapor-btn-main {
+.voiceqwen-theme-90ties .vapor-btn-main {
     width: calc(100% - 30px);
     margin: 15px;
     background: #0000ff;
@@ -346,27 +348,27 @@ html {
     transition: transform 0.1s;
 }
 
-.vapor-btn-main:active {
+.voiceqwen-theme-90ties .vapor-btn-main:active {
     transform: translate(4px, 4px);
 }
 
-.vapor-btn-main:disabled {
+.voiceqwen-theme-90ties .vapor-btn-main:disabled {
     background: #888;
     cursor: not-allowed;
 }
 
 /* Status and Audio */
-#status-msg {
+.voiceqwen-theme-90ties #status-msg {
     padding: 0 15px 15px;
     font-size: 18px;
     color: #000;
 }
 
-#audio-container {
+.voiceqwen-theme-90ties #audio-container {
     padding: 0 15px 15px;
 }
 
-.vapor-deco-text {
+.voiceqwen-theme-90ties .vapor-deco-text {
     position: absolute;
     top: -20px;
     right: 20px;
@@ -378,12 +380,12 @@ html {
     z-index: -1;
 }
 
-.hidden {
+.voiceqwen-theme-90ties .hidden {
     display: none;
 }
 
 /* Context Menu */
-.vapor-context-menu {
+.voiceqwen-theme-90ties .vapor-context-menu {
     position: absolute;
     background: #fff;
     border: 3px solid #0000ff;
@@ -392,7 +394,7 @@ html {
     box-shadow: 6px 6px 0px rgba(0, 0, 0, 0.1);
 }
 
-.vapor-context-menu div {
+.voiceqwen-theme-90ties .vapor-context-menu div {
     padding: 8px 12px;
     cursor: pointer;
     font-size: 18px;
@@ -400,16 +402,16 @@ html {
     border-bottom: 2px dotted #0000ff;
 }
 
-.vapor-context-menu div:last-child {
+.voiceqwen-theme-90ties .vapor-context-menu div:last-child {
     border-bottom: none;
 }
 
-.vapor-context-menu div:hover {
+.voiceqwen-theme-90ties .vapor-context-menu div:hover {
     background: #ffeef2;
 }
 
 /* Rename Input */
-.vapor-rename-input {
+.voiceqwen-theme-90ties .vapor-rename-input {
     background: #fff;
     border: 2px solid #0000ff;
     font-family: 'VT323', monospace;
@@ -419,12 +421,12 @@ html {
     color: #000;
 }
 /* Avatar Overlay */
-.avatar-circle {
+.voiceqwen-theme-90ties .avatar-circle {
     position: relative;
     overflow: hidden;
 }
 
-.avatar-overlay {
+.voiceqwen-theme-90ties .avatar-overlay {
     position: absolute;
     top: 0;
     left: 0;
@@ -442,60 +444,60 @@ html {
     pointer-events: none;
 }
 
-.avatar-circle:hover .avatar-overlay {
+.voiceqwen-theme-90ties .avatar-circle:hover .avatar-overlay {
     opacity: 1;
 }
 
-.hidden {
+.voiceqwen-theme-90ties .hidden {
     display: none !important;
 }
 
-.status-pass {
+.voiceqwen-theme-90ties .status-pass {
     color: #008800 !important;
     font-weight: bold;
 }
 
-.status-fail {
+.voiceqwen-theme-90ties .status-fail {
     color: #ff0000 !important;
     font-weight: bold;
 }
 
 /* Waveform Viewer Extras */
-.file-item.active-file {
+.voiceqwen-theme-90ties .file-item.active-file {
     background: #0000ff !important;
     color: #fff !important;
     border-bottom-style: solid;
 }
 
-.file-item.active-file .file-name {
+.voiceqwen-theme-90ties .file-item.active-file .file-name {
     color: #fff !important;
 }
 
-#view-waveform .vapor-pane {
+.voiceqwen-theme-90ties #view-waveform .vapor-pane {
     display: flex;
     flex-direction: column;
     gap: 20px;
     min-height: 480px;
 }
 
-#wave-viewer-empty, #wave-viewer-loading, #wave-viewer-container {
+.voiceqwen-theme-90ties #wave-viewer-empty, .voiceqwen-theme-90ties #wave-viewer-loading, .voiceqwen-theme-90ties #wave-viewer-container {
     min-height: 380px;
 }
 
-#waveform {
+.voiceqwen-theme-90ties #waveform {
     cursor: pointer;
     box-shadow: inset 0 0 10px #000;
     min-height: 150px;
 }
 
-#wave-controls .nav-btn:hover {
+.voiceqwen-theme-90ties #wave-controls .nav-btn:hover {
     background: #ff00ff;
     color: #fff;
     border-color: #000;
 }
 
 /* Floating Delete Button */
-.vapor-floating-btn {
+.voiceqwen-theme-90ties .vapor-floating-btn {
     position: absolute;
     z-index: 9999;
     background: #ff0055;
@@ -509,19 +511,19 @@ html {
     font-size: 14px;
 }
 
-.vapor-floating-btn:hover {
+.voiceqwen-theme-90ties .vapor-floating-btn:hover {
     background: #ff0000;
     transform: translate(-2px, -2px);
     box-shadow: 6px 6px 0 #000;
 }
 
-.vapor-floating-btn:active {
+.voiceqwen-theme-90ties .vapor-floating-btn:active {
     transform: translate(0, 0);
     box-shadow: 2px 2px 0 #000;
 }
 
 /* Tree View and Folders */
-.folder-item-row {
+.voiceqwen-theme-90ties .folder-item-row {
     cursor: pointer;
     font-weight: bold;
     color: #4b0082;
@@ -536,30 +538,30 @@ html {
     position: relative;
 }
 
-.folder-item-row:hover {
+.voiceqwen-theme-90ties .folder-item-row:hover {
     background: rgba(75, 0, 130, 0.1);
 }
 
-.folder-icon:before {
+.voiceqwen-theme-90ties .folder-icon:before {
     content: '📁';
     font-size: 14px;
 }
 
-.expanded .folder-icon:before {
+.voiceqwen-theme-90ties .expanded .folder-icon:before {
     content: '📂';
 }
 
-.folder-children {
+.voiceqwen-theme-90ties .folder-children {
     padding-left: 15px;
     border-left: 1px dashed #4b0082;
     margin-left: 10px;
 }
 
-.folder-children.hidden {
+.voiceqwen-theme-90ties .folder-children.hidden {
     display: none;
 }
 
-.file-item {
+.voiceqwen-theme-90ties .file-item {
     cursor: grab;
     transition: transform 0.1s;
     display: flex;
@@ -568,22 +570,22 @@ html {
     padding: 5px;
 }
 
-.file-item:active {
+.voiceqwen-theme-90ties .file-item:active {
     cursor: grabbing;
 }
 
 /* Drag and Drop States */
-.is-dragging {
+.voiceqwen-theme-90ties .is-dragging {
     opacity: 0.4;
     border: 2px dashed #ff00ff !important;
 }
 
-.drop-hover {
+.voiceqwen-theme-90ties .drop-hover {
     background: rgba(255, 0, 255, 0.2) !important;
     outline: 2px solid #ff00ff;
 }
 
-.root-drop-zone {
+.voiceqwen-theme-90ties .root-drop-zone {
     height: 15px;
     margin: 5px 0;
     border: 1px dashed rgba(0,0,255,0.2);
@@ -595,7 +597,7 @@ html {
     transition: all 0.2s;
 }
 
-.root-drop-zone.drop-hover {
+.voiceqwen-theme-90ties .root-drop-zone.drop-hover {
     border-color: #ff00ff;
     background: rgba(255,0,255,0.05);
     color: #ff00ff;
@@ -603,15 +605,15 @@ html {
 }
 
 /* Reorder Indicators */
-.drag-over-top {
+.voiceqwen-theme-90ties .drag-over-top {
     border-top: 4px solid #ff00ff !important;
 }
 
-.drag-over-bottom {
+.voiceqwen-theme-90ties .drag-over-bottom {
     border-bottom: 4px solid #ff00ff !important;
 }
 
-.folder-item-back {
+.voiceqwen-theme-90ties .folder-item-back {
     cursor: pointer;
     padding: 10px;
     background: rgba(0, 0, 255, 0.1);
@@ -627,8 +629,433 @@ html {
     text-transform: uppercase;
 }
 
-.folder-item-back:hover {
+.voiceqwen-theme-90ties .folder-item-back:hover {
     background: rgba(0, 0, 255, 0.2);
     color: #ff00ff;
     padding-left: 15px;
+}
+
+/* ==========================================================================
+   MINIMAL THEME
+   ========================================================================== */
+
+.voiceqwen-theme-minimal .vapor-grid-bg {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: -1;
+    background-color: #f8fafc;
+}
+
+/* Aggressive Layout Fixes to remove title and top spacing */
+.voiceqwen-theme-minimal header.entry-header,
+.voiceqwen-theme-minimal .entry-title,
+.voiceqwen-theme-minimal .post-title,
+.voiceqwen-theme-minimal .page-title,
+.voiceqwen-theme-minimal h1.entry-title,
+.voiceqwen-theme-minimal h1.wp-block-post-title,
+.voiceqwen-theme-minimal .site-header,
+.voiceqwen-theme-minimal .site-branding,
+.voiceqwen-theme-minimal .entry-header {
+    display: none !important;
+}
+
+.voiceqwen-theme-minimal #content,
+.voiceqwen-theme-minimal .site-content,
+.voiceqwen-theme-minimal .entry-content,
+.voiceqwen-theme-minimal .content-area,
+.voiceqwen-theme-minimal #primary,
+.voiceqwen-theme-minimal main,
+.voiceqwen-theme-minimal article,
+.voiceqwen-theme-minimal div.wp-block-group.has-background {
+    padding-top: 0 !important;
+    margin-top: 0 !important;
+    top: 0 !important;
+}
+
+.voiceqwen-theme-minimal body,
+.voiceqwen-theme-minimal html {
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
+.voiceqwen-theme-minimal .vapor-container {
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 40px 20px;
+    font-family: 'Montserrat', sans-serif;
+    position: relative;
+    z-index: 1;
+    color: #334155;
+}
+
+/* Main Header */
+.voiceqwen-theme-minimal .vapor-header {
+    background: #ffffff;
+    color: #0f172a;
+    padding: 15px 25px;
+    display: flex;
+    align-items: center;
+    border: 1px solid #e2e8f0;
+    margin-bottom: 30px;
+    border-radius: 8px;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+}
+
+.voiceqwen-theme-minimal .vapor-dots {
+    display: none;
+}
+
+.voiceqwen-theme-minimal .vapor-title {
+    font-size: 20px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+}
+
+.voiceqwen-theme-minimal .vapor-nav {
+    margin-left: auto;
+    display: flex;
+    gap: 15px;
+}
+
+.voiceqwen-theme-minimal .nav-btn {
+    background: transparent;
+    border: none;
+    color: #64748b;
+    font-family: 'Montserrat', sans-serif;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    padding: 6px 12px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border-radius: 6px;
+}
+
+.voiceqwen-theme-minimal .nav-btn.active {
+    background: #0f172a;
+    color: #ffffff;
+}
+
+.voiceqwen-theme-minimal .nav-btn:hover:not(.active) {
+    background: #f1f5f9;
+    color: #0f172a;
+}
+
+/* Forms */
+.voiceqwen-theme-minimal .form-group {
+    margin-bottom: 24px;
+}
+
+.voiceqwen-theme-minimal .form-group label {
+    display: block;
+    font-size: 14px;
+    font-weight: 600;
+    color: #0f172a;
+    margin-bottom: 8px;
+}
+
+.voiceqwen-theme-minimal .form-group input[type="text"],
+.voiceqwen-theme-minimal .form-group textarea {
+    width: 100%;
+    box-sizing: border-box;
+    border: 1px solid #cbd5e1;
+    padding: 12px;
+    font-family: 'Montserrat', sans-serif;
+    font-size: 14px;
+    border-radius: 6px;
+    transition: border-color 0.2s;
+    background: #ffffff;
+}
+
+.voiceqwen-theme-minimal .form-group input[type="text"]:focus,
+.voiceqwen-theme-minimal .form-group textarea:focus {
+    outline: none;
+    border-color: #0f172a;
+    box-shadow: 0 0 0 2px rgba(15, 23, 42, 0.1);
+}
+
+.voiceqwen-theme-minimal .form-group input[type="file"] {
+    font-family: 'Montserrat', sans-serif;
+    font-size: 14px;
+}
+
+.voiceqwen-theme-minimal .form-group small {
+    display: block;
+    color: #64748b;
+    font-size: 13px;
+    margin-top: 6px;
+}
+
+/* Body and Windows */
+.voiceqwen-theme-minimal .vapor-body {
+    display: flex;
+    flex-direction: column-reverse;
+    gap: 30px;
+    align-items: stretch;
+}
+
+.voiceqwen-theme-minimal .vapor-window {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    padding: 0;
+    position: relative;
+    border-radius: 8px;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+    overflow: hidden;
+}
+
+.voiceqwen-theme-minimal .vapor-window.sidebar {
+    width: 100%;
+}
+
+.voiceqwen-theme-minimal .vapor-window.main {
+    width: 100%;
+}
+
+.voiceqwen-theme-minimal .vapor-window-header {
+    background: #f8fafc;
+    border-bottom: 1px solid #e2e8f0;
+    padding: 15px 20px;
+    display: flex;
+    align-items: center;
+}
+
+.voiceqwen-theme-minimal .vapor-window-header .vapor-dots {
+    display: none;
+}
+
+.voiceqwen-theme-minimal .vapor-window-title {
+    color: #0f172a;
+    font-size: 16px;
+    font-weight: 600;
+}
+
+/* List */
+.voiceqwen-theme-minimal .vapor-list {
+    list-style: none;
+    margin: 0;
+    padding: 10px;
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.voiceqwen-theme-minimal .vapor-list li {
+    padding: 10px 15px;
+    border-bottom: 1px solid #f1f5f9;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 14px;
+    cursor: pointer;
+    color: #334155;
+    border-radius: 6px;
+    margin-bottom: 2px;
+}
+
+.voiceqwen-theme-minimal .vapor-list li:hover {
+    background: #f8fafc;
+}
+
+.voiceqwen-theme-minimal .vapor-list li .delete-btn,
+.voiceqwen-theme-minimal .trash-btn {
+    background: transparent;
+    border: none;
+    color: #94a3b8;
+    font-size: 14px;
+    cursor: pointer;
+    padding: 4px;
+    margin-left: 5px;
+    transition: all 0.2s;
+}
+
+.voiceqwen-theme-minimal .trash-btn:hover {
+    color: #ef4444;
+}
+
+/* Tabs */
+.voiceqwen-theme-minimal .vapor-tabs {
+    display: flex;
+    padding: 15px 20px 0;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.voiceqwen-theme-minimal .vapor-tab {
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    padding: 10px 15px;
+    font-family: 'Montserrat', sans-serif;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    margin-right: 15px;
+    color: #64748b;
+    transition: all 0.2s;
+}
+
+.voiceqwen-theme-minimal .vapor-tab.active {
+    color: #0f172a;
+    border-bottom-color: #0f172a;
+}
+
+/* Pane */
+.voiceqwen-theme-minimal .vapor-pane {
+    padding: 20px;
+}
+
+.voiceqwen-theme-minimal #tts-text,
+.voiceqwen-theme-minimal #dialogue-text {
+    width: 100%;
+    box-sizing: border-box;
+    border: 1px solid #cbd5e1;
+    padding: 15px;
+    font-family: 'Montserrat', sans-serif;
+    font-size: 15px;
+    line-height: 1.5;
+    background: #ffffff;
+    color: #0f172a;
+    border-radius: 6px;
+    transition: border-color 0.2s;
+}
+
+.voiceqwen-theme-minimal #tts-text:focus,
+.voiceqwen-theme-minimal #dialogue-text:focus {
+    outline: none;
+    border-color: #0f172a;
+    box-shadow: 0 0 0 2px rgba(15, 23, 42, 0.1);
+}
+
+/* Voice Selector */
+.voiceqwen-theme-minimal .voice-selector {
+    padding: 20px;
+    display: flex;
+    gap: 25px;
+    justify-content: center;
+    border-bottom: 1px solid #e2e8f0;
+    background: #ffffff;
+}
+
+.voiceqwen-theme-minimal .avatar-radio {
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    position: relative;
+}
+
+.voiceqwen-theme-minimal .avatar-radio input {
+    position: absolute;
+    opacity: 0;
+    cursor: pointer;
+}
+
+.voiceqwen-theme-minimal .avatar-circle {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    border: 2px solid transparent;
+    background-size: cover;
+    background-position: center;
+    transition: all 0.2s;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.voiceqwen-theme-minimal .avatar-name {
+    font-family: 'Montserrat', sans-serif;
+    font-size: 13px;
+    font-weight: 500;
+    color: #475569;
+}
+
+.voiceqwen-theme-minimal .avatar-radio input:checked + .avatar-circle {
+    border-color: #0f172a;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.15);
+    transform: scale(1.05);
+}
+
+.voiceqwen-theme-minimal .avatar-radio input:checked ~ .avatar-name {
+    color: #0f172a;
+    font-weight: 600;
+}
+
+/* Main Button */
+.voiceqwen-theme-minimal .vapor-btn-main {
+    width: calc(100% - 40px);
+    margin: 20px;
+    background: #0f172a;
+    color: #ffffff;
+    border: none;
+    border-radius: 6px;
+    padding: 12px 24px;
+    font-family: 'Montserrat', sans-serif;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.voiceqwen-theme-minimal .vapor-btn-main:hover {
+    background: #1e293b;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    transform: translateY(-1px);
+}
+
+.voiceqwen-theme-minimal .vapor-btn-main:active {
+    transform: translateY(0);
+}
+
+.voiceqwen-theme-minimal .vapor-btn-main:disabled {
+    background: #94a3b8;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+}
+
+/* Utility / Misc */
+.voiceqwen-theme-minimal .vapor-deco-text {
+    display: none;
+}
+
+.voiceqwen-theme-minimal .hidden {
+    display: none !important;
+}
+
+.voiceqwen-theme-minimal .stability-control {
+    background: #f8fafc !important;
+    border: 1px solid #e2e8f0 !important;
+    border-radius: 6px;
+    padding: 15px !important;
+}
+
+.voiceqwen-theme-minimal .stability-control label {
+    color: #0f172a !important;
+    font-size: 13px;
+}
+
+/* Waveform Viewer Extras */
+.voiceqwen-theme-minimal .file-item.active-file {
+    background: #f1f5f9 !important;
+    color: #0f172a !important;
+    font-weight: 600;
+}
+
+.voiceqwen-theme-minimal .file-item.active-file .file-name {
+    color: #0f172a !important;
+}
+
+.voiceqwen-theme-minimal #waveform {
+    cursor: pointer;
+    background: #f8fafc !important;
+    border: 1px solid #e2e8f0 !important;
+    border-radius: 6px;
+    min-height: 150px;
+}
+
+.voiceqwen-theme-minimal #waveform-title {
+    color: #0f172a !important;
 }

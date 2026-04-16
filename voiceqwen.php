@@ -44,6 +44,7 @@ function voiceqwen_enqueue_assets() {
     ) );
     wp_enqueue_script( 'wavesurfer', 'https://unpkg.com/wavesurfer.js@7', array(), null, true );
     wp_enqueue_script( 'wavesurfer-regions', 'https://unpkg.com/wavesurfer.js@7/dist/plugins/regions.min.js', array( 'wavesurfer' ), null, true );
+    wp_enqueue_script( 'wavesurfer-timeline', 'https://unpkg.com/wavesurfer.js@7/dist/plugins/timeline.min.js', array( 'wavesurfer' ), null, true );
 }
 add_action( 'wp_enqueue_scripts', 'voiceqwen_enqueue_assets' );
 
@@ -84,239 +85,254 @@ function voiceqwen_ui_shortcode() {
         return '<p>Debes iniciar sesión para usar este plugin.</p>';
     }
 
+    $theme = get_option( 'voiceqwen_theme', '90ties' );
+    $deco_text = ( $theme === '90ties' ) ? "90's" : "";
+
     ob_start();
     ?>
-    <div class="vapor-grid-bg"></div>
-    <div class="vapor-container">
-        <div class="vapor-header">
-            <div class="vapor-dots">
-                <span></span><span></span><span></span>
+    <div class="voiceqwen-main-wrapper voiceqwen-theme-<?php echo esc_attr( $theme ); ?>">
+        <div class="vapor-grid-bg"></div>
+        <div class="vapor-container">
+            <div class="vapor-header">
+                <div class="vapor-dots">
+                    <span></span><span></span><span></span>
+                </div>
+                <div class="vapor-title">ARCHETYPICAL CHILEAN</div>
+                <div class="vapor-nav">
+                    <button class="nav-btn active" data-view="create">CREATE AUDIO</button>
+                    <button class="nav-btn" data-view="dialogues">DIALOGUES</button>
+                    <button class="nav-btn" data-view="waveform">WAVE VIEWER</button>
+                    <button class="nav-btn" data-view="upload-voice">UPLOAD VOICE</button>
+                </div>
             </div>
-            <div class="vapor-title">ARCHETYPICAL CHILEAN</div>
-            <div class="vapor-nav">
-                <button class="nav-btn active" data-view="create">CREATE AUDIO</button>
-                <button class="nav-btn" data-view="dialogues">DIALOGUES</button>
-                <button class="nav-btn" data-view="waveform">WAVE VIEWER</button>
-                <button class="nav-btn" data-view="upload-voice">UPLOAD VOICE</button>
-            </div>
-        </div>
-        
-        <div class="vapor-body">
-            <!-- Sidebar: File Viewer -->
-            <div class="vapor-window sidebar">
-                <div class="vapor-window-header" style="display: flex; justify-content: space-between; align-items: center; padding-right: 10px;">
-                    <div style="display: flex; align-items: center;">
+            
+            <div class="vapor-body">
+                <!-- Sidebar: File Viewer -->
+                <div class="vapor-window sidebar">
+                    <div class="vapor-window-header" style="display: flex; justify-content: space-between; align-items: center; padding-right: 10px;">
+                        <div style="display: flex; align-items: center;">
+                            <div class="vapor-dots"><span></span><span></span><span></span></div>
+                            <div class="vapor-window-title">Mis Archivos</div>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 5px;">
+                            <button id="sidebar-new-folder-btn" class="nav-btn" style="background:#fff; border:2px solid #000; color:#000; padding: 2px 8px; font-size: 10px; height: 18px; line-height: 1;" title="Nueva Carpeta">📁+</button>
+                            <button id="frontend-analyze-btn" class="nav-btn" style="width: auto; margin: 0; padding: 2px 8px; font-size: 10px; height: 18px; line-height: 1;">ANALYZE</button>
+                        </div>
+                    </div>
+                    <ul id="file-list" class="vapor-list">
+                        <li class="loading">Cargando...</li>
+                    </ul>
+                    <div id="sidebar-player"></div>
+                </div>
+
+                <!-- View 1: Create Audio -->
+                <div class="vapor-window main view-pane" id="view-create">
+                    <div class="vapor-window-header">
                         <div class="vapor-dots"><span></span><span></span><span></span></div>
-                        <div class="vapor-window-title">Mis Archivos</div>
-                    </div>
-                    <div style="display: flex; align-items: center; gap: 5px;">
-                        <button id="sidebar-new-folder-btn" class="nav-btn" style="background:#fff; border:2px solid #000; color:#000; padding: 2px 8px; font-size: 10px; height: 18px; line-height: 1;" title="Nueva Carpeta">📁+</button>
-                        <button id="frontend-analyze-btn" class="nav-btn" style="width: auto; margin: 0; padding: 2px 8px; font-size: 10px; height: 18px; line-height: 1;">ANALYZE</button>
-                    </div>
-                </div>
-                <ul id="file-list" class="vapor-list">
-                    <li class="loading">Cargando...</li>
-                </ul>
-                <div id="sidebar-player"></div>
-            </div>
-
-            <!-- View 1: Create Audio -->
-            <div class="vapor-window main view-pane" id="view-create">
-                <div class="vapor-window-header">
-                    <div class="vapor-dots"><span></span><span></span><span></span></div>
-                    <div class="vapor-window-title">SELECCIONA TU CHILENO FAVORITO</div>
-                </div>
-                
-                <div class="voice-selector" id="dynamic-voice-selector">
-                    <!-- Loaded dynamically via JS/PHP -->
-                    <p>Cargando voces...</p>
-                </div>
-                
-                <div class="vapor-tabs">
-                    <button class="vapor-tab active" data-tab="textarea">Texto</button>
-                    <button class="vapor-tab" data-tab="upload">Archivo .txt</button>
-                </div>
-
-                <div class="vapor-pane" id="pane-textarea">
-                    <textarea id="tts-text" placeholder="Escribe el texto aquí..."></textarea>
-                </div>
-
-                <div class="vapor-pane hidden" id="pane-upload">
-                    <div class="upload-box">
-                        <label for="tts-file">Seleccionar archivo .txt:</label>
-                        <input type="file" id="tts-file" accept=".txt">
-                    </div>
-                </div>
-
-                <div class="stability-control" style="margin: 15px 0; padding: 10px; background: rgba(255,0,255,0.05); border: 1px solid #ff00ff;">
-                    <label style="display: block; font-weight: bold; margin-bottom: 5px; color: #ff00ff;">ESTABILIDAD VOCAL (TIMBRE): <span id="stability-val">0.7</span></label>
-                    <input type="range" id="tts-stability" min="0.1" max="1.0" step="0.1" value="0.7" style="width: 100%; cursor: pointer;">
-                    <div style="display: flex; justify-content: space-between; font-size: 11px; margin-top: 5px;">
-                        <span>EXPRESIVO</span>
-                        <span>ESTABLE (RECOMENDADO)</span>
-                    </div>
-                </div>
-
-                <div class="controls">
-                    <button id="generate-btn" class="vapor-btn-main">Generar Audio</button>
-                    <button id="reset-status-btn" class="vapor-btn-main hidden" style="background: #ff0000; margin-top: 5px; font-size: 18px;">Cancelar / Reset</button>
-                </div>
-
-                <div id="status-msg"></div>
-                <div id="audio-container"></div>
-            </div>
-
-            <!-- View 2: Upload Voice -->
-            <div class="vapor-window main view-pane hidden" id="view-upload-voice">
-                <div class="vapor-window-header">
-                    <div class="vapor-dots"><span></span><span></span><span></span></div>
-                    <div class="vapor-window-title">NUEVO CHILENO FAVORITO</div>
-                </div>
-                
-                <div class="vapor-pane">
-                    <form id="upload-voice-form">
-                        <div class="form-group">
-                            <label>Nombre del Personaje:</label>
-                            <input type="text" id="new-voice-name" placeholder="Ej: Condorito" required>
-                        </div>
-                        
-                        <div class="form-group">
-                            <label>Audio de Muestra (.wav):</label>
-                            <input type="file" id="new-voice-audio" accept=".wav" required>
-                            <small>Muestra de voz clara, idealmente 10-20 segundos.</small>
-                        </div>
-
-                        <div class="form-group">
-                            <label>Transcripción Exacta:</label>
-                            <textarea id="new-voice-text" placeholder="Escribe exactamente lo que dice el audio de arriba..." required></textarea>
-                        </div>
-
-                        <div class="form-group">
-                            <label>Foto de Avatar:</label>
-                            <input type="file" id="new-voice-avatar" accept="image/*" required>
-                        </div>
-
-                        <button type="submit" class="vapor-btn-main" style="margin: 20px 0 0 0; width: 100%;">GUARDAR CHILENO</button>
-                    </form>
-                    <div id="upload-status" style="margin-top: 15px;"></div>
-                </div>
-            </div>
-
-            <!-- View 4: Dialogues -->
-            <div class="vapor-window main view-pane hidden" id="view-dialogues">
-                <div class="vapor-window-header">
-                    <div class="vapor-dots"><span></span><span></span><span></span></div>
-                    <div class="vapor-window-title">MULTI-VOICE DIALOGUES</div>
-                </div>
-                
-                <div class="vapor-pane">
-                    <!-- Dialogue Help Container -->
-                    <div class="vapor-window help-box" style="margin-bottom: 20px; border-style: dashed; background: rgba(0,0,255,0.02);">
-                        <div class="vapor-window-header" style="height: 30px; padding: 5px 10px; background: rgba(0,0,255,0.1); border-bottom: 1px dashed #0000ff;">
-                            <div class="vapor-window-title" style="font-size: 14px;">📖 GUÍA DE DIÁLOGOS</div>
-                        </div>
-                        <div style="padding: 15px; font-size: 16px; line-height: 1.4;">
-                            <div style="margin-bottom: 10px;">
-                                <strong>FORMATO:</strong> Envuelve cada fragmento con el nombre del personaje. 
-                                <br><code style="background: #fff; border: 1px solid #0000ff; padding: 2px 5px; font-size: 14px;">[Nombre]Texto del diálogo...[/Nombre]</code>
-                            </div>
-                            <div style="margin-bottom: 15px;">
-                                <strong>TIP:</strong> Puedes hacer clic en los nombres de abajo para insertar la etiqueta automáticamente.
-                            </div>
-                            <div id="dialogue-voice-chips" style="display: flex; flex-wrap: wrap; gap: 8px;">
-                                <!-- Cargado dinámicamente -->
-                                <span style="opacity: 0.5;">Cargando personajes disponibles...</span>
-                            </div>
-                        </div>
+                        <div class="vapor-window-title">SELECCIONA TU CHILENO FAVORITO</div>
                     </div>
                     
-                    <textarea id="dialogue-text" placeholder="[Fernando]Hola Alodia, ¿cómo estás?[/Fernando] [Alodia Corral]¡Muy bien Fernando! Estamos al aire...[/Alodia Corral]" style="height: 200px;"></textarea>
+                    <div class="voice-selector" id="dynamic-voice-selector">
+                        <!-- Loaded dynamically via JS/PHP -->
+                        <p>Cargando voces...</p>
+                    </div>
                     
+                    <div class="vapor-tabs">
+                        <button class="vapor-tab active" data-tab="textarea">Texto</button>
+                        <button class="vapor-tab" data-tab="upload">Archivo .txt</button>
+                    </div>
+
+                    <div class="vapor-pane" id="pane-textarea">
+                        <textarea id="tts-text" placeholder="Escribe el texto aquí..."></textarea>
+                    </div>
+
+                    <div class="vapor-pane hidden" id="pane-upload">
+                        <div class="upload-box">
+                            <label for="tts-file">Seleccionar archivo .txt:</label>
+                            <input type="file" id="tts-file" accept=".txt">
+                        </div>
+                    </div>
+
                     <div class="stability-control" style="margin: 15px 0; padding: 10px; background: rgba(255,0,255,0.05); border: 1px solid #ff00ff;">
-                        <label style="display: block; font-weight: bold; margin-bottom: 5px; color: #ff00ff;">ESTABILIDAD VOCAL (TIMBRE): <span id="dialogue-stability-val">0.7</span></label>
-                        <input type="range" id="dialogue-stability" min="0.1" max="1.0" step="0.1" value="0.7" style="width: 100%; cursor: pointer;">
+                        <label style="display: block; font-weight: bold; margin-bottom: 5px; color: #ff00ff;">ESTABILIDAD VOCAL (TIMBRE): <span id="stability-val">0.7</span></label>
+                        <input type="range" id="tts-stability" min="0.1" max="1.0" step="0.1" value="0.7" style="width: 100%; cursor: pointer;">
                         <div style="display: flex; justify-content: space-between; font-size: 11px; margin-top: 5px;">
                             <span>EXPRESIVO</span>
-                            <span>ESTABLE</span>
+                            <span>ESTABLE (RECOMENDADO)</span>
                         </div>
                     </div>
+
+                    <div class="controls">
+                        <button id="generate-btn" class="vapor-btn-main">Generar Audio</button>
+                        <button id="reset-status-btn" class="vapor-btn-main hidden" style="background: #ff0000; margin-top: 5px; font-size: 18px;">Cancelar / Reset</button>
+                    </div>
+
+                    <div id="status-msg"></div>
+                    <div id="audio-container"></div>
                 </div>
 
-                <div class="controls">
-                    <button id="generate-dialogue-btn" class="vapor-btn-main">Generar Diálogo</button>
-                </div>
-                <div id="dialogue-status-msg"></div>
-            </div>
-
-            <!-- View 3: Analysis -->
-            <div class="vapor-window main view-pane hidden" id="id-view-analysis">
-                <div class="vapor-window-header">
-                    <div class="vapor-dots"><span></span><span></span><span></span></div>
-                    <div class="vapor-window-title">AUDIO QUALITY REPORT</div>
-                </div>
-                
-                <div id="fn-analysis-loading" class="hidden" style="text-align: center; padding: 40px;">
-                    <div class="vapor-dots" style="justify-content: center; margin-bottom: 15px;"><span></span><span></span><span></span></div>
-                    <p style="font-size: 24px;">RUNNING QC ENGINE...</p>
-                </div>
-
-                <div id="fn-analysis-results" class="hidden">
-                    <div class="vapor-pane" style="max-height: 400px; overflow-y: auto;">
-                        <table class="fn-report-table" style="width: 100%; border-collapse: collapse;">
-                            <thead>
-                                <tr style="border-bottom: 3px solid #000; text-align: left; color: #0000ff;">
-                                    <th style="padding: 5px;">File</th>
-                                    <th style="padding: 5px;">Peak</th>
-                                    <th style="padding: 5px;">RMS</th>
-                                    <th style="padding: 5px;">Status</th>
-                                </tr>
-                            </thead>
-                            <tbody id="fn-analysis-body"></tbody>
-                        </table>
+                <!-- View 2: Upload Voice -->
+                <div class="vapor-window main view-pane hidden" id="view-upload-voice">
+                    <div class="vapor-window-header">
+                        <div class="vapor-dots"><span></span><span></span><span></span></div>
+                        <div class="vapor-window-title">NUEVO CHILENO FAVORITO</div>
                     </div>
                     
-                    <div class="vapor-pane" style="border-top: 3px solid #0000ff; background: rgba(255,0,255,0.05);">
-                        <div id="fn-analysis-summary"></div>
-                        <div id="fn-analysis-recommendation" style="margin-top: 15px; padding: 10px; border: 2px dashed #ff00ff;"></div>
+                    <div class="vapor-pane">
+                        <form id="upload-voice-form">
+                            <div class="form-group">
+                                <label>Nombre del Personaje:</label>
+                                <input type="text" id="new-voice-name" placeholder="Ej: Condorito" required>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label>Audio de Muestra (.wav):</label>
+                                <input type="file" id="new-voice-audio" accept=".wav" required>
+                                <small>Muestra de voz clara, idealmente 10-20 segundos.</small>
+                            </div>
+
+                            <div class="form-group">
+                                <label>Transcripción Exacta:</label>
+                                <textarea id="new-voice-text" placeholder="Escribe exactamente lo que dice el audio de arriba..." required></textarea>
+                            </div>
+
+                            <div class="form-group">
+                                <label>Foto de Avatar:</label>
+                                <input type="file" id="new-voice-avatar" accept="image/*" required>
+                            </div>
+
+                            <button type="submit" class="vapor-btn-main" style="margin: 20px 0 0 0; width: 100%;">GUARDAR CHILENO</button>
+                        </form>
+                        <div id="upload-status" style="margin-top: 15px;"></div>
                     </div>
                 </div>
 
-                <div class="controls" style="padding: 10px;">
-                    <button class="nav-btn-back" data-view="create" style="background:#fff; border:2px solid #000; color:#000; padding:5px 10px; cursor:pointer;">← BACK TO CREATE</button>
-                </div>
-            </div>
+                <!-- View 4: Dialogues -->
+                <div class="vapor-window main view-pane hidden" id="view-dialogues">
+                    <div class="vapor-window-header">
+                        <div class="vapor-dots"><span></span><span></span><span></span></div>
+                        <div class="vapor-window-title">MULTI-VOICE DIALOGUES</div>
+                    </div>
+                    
+                    <div class="vapor-pane">
+                        <!-- Dialogue Help Container -->
+                        <div class="vapor-window help-box" style="margin-bottom: 20px; border-style: dashed; background: rgba(0,0,255,0.02);">
+                            <div class="vapor-window-header" style="height: 30px; padding: 5px 10px; background: rgba(0,0,255,0.1); border-bottom: 1px dashed #0000ff;">
+                                <div class="vapor-window-title" style="font-size: 14px;">📖 GUÍA DE DIÁLOGOS</div>
+                            </div>
+                            <div style="padding: 15px; font-size: 16px; line-height: 1.4;">
+                                <div style="margin-bottom: 10px;">
+                                    <strong>FORMATO:</strong> Envuelve cada fragmento con el nombre del personaje. 
+                                    <br><code style="background: #fff; border: 1px solid #0000ff; padding: 2px 5px; font-size: 14px;">[Nombre]Texto del diálogo...[/Nombre]</code>
+                                </div>
+                                <div style="margin-bottom: 15px;">
+                                    <strong>TIP:</strong> Puedes hacer clic en los nombres de abajo para insertar la etiqueta automáticamente.
+                                </div>
+                                <div id="dialogue-voice-chips" style="display: flex; flex-wrap: wrap; gap: 8px;">
+                                    <!-- Cargado dinámicamente -->
+                                    <span style="opacity: 0.5;">Cargando personajes disponibles...</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <textarea id="dialogue-text" placeholder="[Fernando]Hola Alodia, ¿cómo estás?[/Fernando] [Alodia Corral]¡Muy bien Fernando! Estamos al aire...[/Alodia Corral]" style="height: 200px;"></textarea>
+                        
+                        <div class="stability-control" style="margin: 15px 0; padding: 10px; background: rgba(255,0,255,0.05); border: 1px solid #ff00ff;">
+                            <label style="display: block; font-weight: bold; margin-bottom: 5px; color: #ff00ff;">ESTABILIDAD VOCAL (TIMBRE): <span id="dialogue-stability-val">0.7</span></label>
+                            <input type="range" id="dialogue-stability" min="0.1" max="1.0" step="0.1" value="0.7" style="width: 100%; cursor: pointer;">
+                            <div style="display: flex; justify-content: space-between; font-size: 11px; margin-top: 5px;">
+                                <span>EXPRESIVO</span>
+                                <span>ESTABLE</span>
+                            </div>
+                        </div>
+                    </div>
 
-            <!-- View 5: Waveform Viewer -->
-            <div class="vapor-window main view-pane hidden" id="view-waveform">
-                <div class="vapor-window-header">
-                    <div class="vapor-dots"><span></span><span></span><span></span></div>
-                    <div class="vapor-window-title">WAVEFORM VISUALIZER</div>
+                    <div class="controls">
+                        <button id="generate-dialogue-btn" class="vapor-btn-main">Generar Diálogo</button>
+                    </div>
+                    <div id="dialogue-status-msg"></div>
                 </div>
-                <div class="vapor-pane">
-                    <div id="wave-viewer-empty" style="text-align: center; padding: 50px; color: #0000ff; border: 2px dashed #0000ff; background: rgba(0,0,255,0.05);">
-                        <div style="font-size: 40px; margin-bottom: 10px;">📡</div>
-                        Selecciona un archivo del panel izquierdo para visualizar su frecuencia.
+
+                <!-- View 3: Analysis -->
+                <div class="vapor-window main view-pane hidden" id="id-view-analysis">
+                    <div class="vapor-window-header">
+                        <div class="vapor-dots"><span></span><span></span><span></span></div>
+                        <div class="vapor-window-title">AUDIO QUALITY REPORT</div>
                     </div>
-                    <div id="wave-viewer-loading" class="hidden" style="text-align: center; padding: 50px; color: #ff00ff;">
-                        <div class="vapor-dots" style="justify-content: center; margin-bottom: 10px;"><span></span><span></span><span></span></div>
-                        CALCULANDO ONDAS...
+                    
+                    <div id="fn-analysis-loading" class="hidden" style="text-align: center; padding: 40px;">
+                        <div class="vapor-dots" style="justify-content: center; margin-bottom: 15px;"><span></span><span></span><span></span></div>
+                        <p style="font-size: 24px;">RUNNING QC ENGINE...</p>
                     </div>
-                    <div id="wave-viewer-container" class="hidden">
-                        <div id="waveform-title" style="margin-bottom: 10px; font-weight: bold; color: #ff00ff; font-size: 20px;"></div>
-                        <div id="waveform" style="background: #0d0d2b; border: 3px solid #0000ff; margin-bottom: 15px;"></div>
-                        <div id="wave-controls" style="display: flex; gap: 15px; align-items: center; justify-content: center; padding: 10px; background: rgba(0,0,255,0.05); border: 2px solid #0000ff;">
-                            <button id="wave-play" type="button" class="nav-btn wave-control-btn" style="width: auto; margin: 0; min-width: 80px;">PLAY</button>
-                            <button id="wave-pause" type="button" class="nav-btn wave-control-btn" style="width: auto; margin: 0; min-width: 80px;">PAUSE</button>
-                            <button id="wave-stop" type="button" class="nav-btn wave-control-btn" style="width: auto; margin: 0; min-width: 80px; background: #888; color: #fff;">STOP</button>
-                            <button id="wave-save" type="button" class="nav-btn hidden" style="width: auto; margin: 0; background: #00ffff; color: #000; font-weight: bold; border: 2px solid #000;">SAVE EDITS</button>
+
+                    <div id="fn-analysis-results" class="hidden">
+                        <div class="vapor-pane" style="max-height: 400px; overflow-y: auto;">
+                            <table class="fn-report-table" style="width: 100%; border-collapse: collapse;">
+                                <thead>
+                                    <tr style="border-bottom: 3px solid #000; text-align: left; color: #0000ff;">
+                                        <th style="padding: 5px;">File</th>
+                                        <th style="padding: 5px;">Peak</th>
+                                        <th style="padding: 5px;">RMS</th>
+                                        <th style="padding: 5px;">Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="fn-analysis-body"></tbody>
+                            </table>
+                        </div>
+                        
+                        <div class="vapor-pane" style="border-top: 3px solid #0000ff; background: rgba(255,0,255,0.05);">
+                            <div id="fn-analysis-summary"></div>
+                            <div id="fn-analysis-recommendation" style="margin-top: 15px; padding: 10px; border: 2px dashed #ff00ff;"></div>
+                        </div>
+                    </div>
+
+                    <div class="controls" style="padding: 10px;">
+                        <button class="nav-btn-back" data-view="create" style="background:#fff; border:2px solid #000; color:#000; padding:5px 10px; cursor:pointer;">← BACK TO CREATE</button>
+                    </div>
+                </div>
+
+                <!-- View 5: Waveform Viewer -->
+                <div class="vapor-window main view-pane hidden" id="view-waveform">
+                    <div class="vapor-window-header">
+                        <div class="vapor-dots"><span></span><span></span><span></span></div>
+                        <div class="vapor-window-title">WAVEFORM VISUALIZER</div>
+                    </div>
+                    <div class="vapor-pane">
+                        <div id="wave-viewer-empty" style="text-align: center; padding: 50px; color: #0000ff; border: 2px dashed #0000ff; background: rgba(0,0,255,0.05);">
+                            <div style="font-size: 40px; margin-bottom: 10px;">📡</div>
+                            Selecciona un archivo del panel izquierdo para visualizar su frecuencia.
+                        </div>
+                        <div id="wave-viewer-loading" class="hidden" style="text-align: center; padding: 50px; color: #ff00ff;">
+                            <div class="vapor-dots" style="justify-content: center; margin-bottom: 10px;"><span></span><span></span><span></span></div>
+                            CALCULANDO ONDAS...
+                        </div>
+                        <div id="wave-viewer-container" class="hidden">
+                            <div id="waveform-title" style="margin-bottom: 10px; font-weight: bold; color: #ff00ff; font-size: 20px;"></div>
+                            <div id="waveform" style="background: #0d0d2b; border: 3px solid #0000ff; margin-bottom: 5px;"></div>
+                            <div id="wave-timeline" style="margin-bottom: 15px; font-size: 10px; color: #888;"></div>
+                            <div id="wave-controls" style="display: flex; gap: 15px; align-items: center; justify-content: center; padding: 10px; background: rgba(0,0,255,0.05); border: 2px solid #0000ff; flex-wrap: wrap;">
+                                <button id="wave-play" type="button" class="nav-btn wave-control-btn" style="width: auto; margin: 0; min-width: 80px;">PLAY</button>
+                                <button id="wave-pause" type="button" class="nav-btn wave-control-btn" style="width: auto; margin: 0; min-width: 80px;">PAUSE</button>
+                                <button id="wave-stop" type="button" class="nav-btn wave-control-btn" style="width: auto; margin: 0; min-width: 80px; background: #888; color: #fff;">STOP</button>
+                                <button id="wave-region-delete" type="button" class="nav-btn hidden" style="width: auto; margin: 0; background: #ff00ff; color: #fff; font-weight: bold; border: 2px solid #000;">DELETE SELECTION</button>
+                                <button id="wave-undo" type="button" class="nav-btn hidden" style="width: auto; margin: 0; background: #ffaa00; color: #000; font-weight: bold; border: 2px solid #000;">UNDO (-1)</button>
+                                <button id="wave-restore" type="button" class="nav-btn hidden" style="width: auto; margin: 0; background: #ff4444; color: #fff; font-weight: bold; border: 2px solid #000;">RESTORE ORIGINAL</button>
+                                <button id="wave-save" type="button" class="nav-btn hidden" style="width: auto; margin: 0; background: #00ffff; color: #000; font-weight: bold; border: 2px solid #000;">SAVE EDITS</button>
+                            </div>
+                            <div style="margin-top: 15px; text-align: center; padding-bottom: 20px;">
+                                <span style="font-size: 12px; font-weight: bold; margin-right: 15px;">ZOOM</span>
+                                <input type="range" id="wave-zoom" min="10" max="1000" value="10" style="width: 80%; display: inline-block; vertical-align: middle;">
+                            </div>
                         </div>
                     </div>
                 </div>
+
             </div>
+            <?php if ( ! empty( $deco_text ) ) : ?>
+                <div class="vapor-deco-text"><?php echo esc_html( $deco_text ); ?></div>
+            <?php endif; ?>
 
         </div>
-        <div class="vapor-deco-text">90's</div>
-
     </div>
     <?php
     return ob_get_clean();
@@ -712,11 +728,16 @@ function voiceqwen_get_file_tree( $dir, $base_url, $relative_path = '' ) {
                 'children' => voiceqwen_get_file_tree( $path, $base_url, $rel )
             );
         } elseif ( str_ends_with( strtolower( $item ), '.wav' ) ) {
+            // Hide backup files from the list
+            if ( str_ends_with( strtolower( $item ), '.original.wav' ) ) continue;
+
+            $has_backup = file_exists( $path . '.original.wav' );
             $tree[] = array(
-                'type'     => 'file',
-                'name'     => $item,
-                'rel_path' => $rel,
-                'url'      => $base_url . $rel
+                'type'       => 'file',
+                'name'       => $item,
+                'rel_path'   => $rel,
+                'url'        => $base_url . $rel,
+                'has_backup' => $has_backup
             );
         }
     }
@@ -853,6 +874,55 @@ function voiceqwen_move_item() {
     }
 }
 add_action( 'wp_ajax_voiceqwen_move_item', 'voiceqwen_move_item' );
+
+/**
+ * AJAX: Upload OS File (Drag & Drop)
+ */
+function voiceqwen_upload_os_file() {
+    check_ajax_referer( 'voiceqwen_nonce', 'nonce' );
+    if ( ! is_user_logged_in() ) wp_send_json_error();
+
+    $current_user = wp_get_current_user();
+    $username = $current_user->user_login;
+    $upload_dir = wp_upload_dir();
+    $user_dir = $upload_dir['basedir'] . '/voiceqwen/' . $username;
+
+    $target_folder = sanitize_text_field( $_POST['target_folder'] );
+    if ( ! empty( $target_folder ) ) {
+        // Prevent path traversal on target folder
+        if ( str_contains( $target_folder, '..' ) ) {
+            wp_send_json_error( 'Ruta inválida' );
+        }
+        $user_dir .= '/' . ltrim( $target_folder, '/' );
+    }
+
+    if ( ! file_exists( $user_dir ) ) {
+        mkdir( $user_dir, 0755, true );
+    }
+
+    if ( isset( $_FILES['file'] ) ) {
+        $file = $_FILES['file'];
+        $filename = sanitize_file_name( $file['name'] );
+        
+        // Ensure it's a wav file
+        if ( ! str_ends_with( strtolower( $filename ), '.wav' ) ) {
+             wp_send_json_error( 'Solo se permiten archivos .wav' );
+        }
+
+        if ( $file['error'] !== UPLOAD_ERR_OK ) {
+             wp_send_json_error( 'Error durante la subida' );
+        }
+        
+        if ( move_uploaded_file( $file['tmp_name'], $user_dir . '/' . $filename ) ) {
+             wp_send_json_success( 'Archivo subido' );
+        } else {
+             wp_send_json_error( 'Error al guardar el archivo' );
+        }
+    } else {
+        wp_send_json_error( 'No se recibió ningún archivo' );
+    }
+}
+add_action( 'wp_ajax_voiceqwen_upload_os_file', 'voiceqwen_upload_os_file' );
 
 /**
  * AJAX: Delete file.
@@ -1054,16 +1124,49 @@ add_action( 'wp_ajax_voiceqwen_upload_voice', 'voiceqwen_upload_voice' );
  */
 function voiceqwen_admin_menu() {
     add_menu_page(
+        'VoiceQwen',
+        'VoiceQwen',
+        'manage_options',
+        'voiceqwen',
+        'voiceqwen_render_theme_page',
+        'dashicons-microphone',
+        6
+    );
+
+    add_submenu_page(
+        'voiceqwen',
+        'Theme Settings',
+        'Theme',
+        'manage_options',
+        'voiceqwen',
+        'voiceqwen_render_theme_page'
+    );
+
+    add_submenu_page(
+        'voiceqwen',
         'Audio Analysis',
         'Audio Analysis',
         'manage_options',
         'audio-analysis',
-        'voiceqwen_render_analysis_page',
-        'dashicons-performance',
-        6
+        'voiceqwen_render_analysis_page'
     );
 }
 add_action( 'admin_menu', 'voiceqwen_admin_menu' );
+
+/**
+ * Render Theme selection page.
+ */
+function voiceqwen_render_theme_page() {
+    // Handle form submission
+    if ( isset( $_POST['voiceqwen_save_theme'] ) && check_admin_referer( 'voiceqwen_theme_nonce' ) ) {
+        $new_theme = sanitize_text_field( $_POST['voiceqwen_theme'] );
+        update_option( 'voiceqwen_theme', $new_theme );
+        echo '<div class="updated"><p>Theme updated successfully!</p></div>';
+    }
+
+    $current_theme = get_option( 'voiceqwen_theme', '90ties' );
+    include plugin_dir_path( __FILE__ ) . 'templates/admin/theme-page.php';
+}
 
 /**
  * Render Audio Analysis page.
@@ -1129,12 +1232,50 @@ function voiceqwen_save_edited_audio() {
     $upload_dir = wp_upload_dir();
     $user_dir = $upload_dir['basedir'] . '/voiceqwen/' . $username;
     $file_path = $user_dir . '/' . $filename;
+    $backup_path = $file_path . '.original.wav';
+
+    // Create a backup only if it doesn't exist (preserve the VERY first generation)
+    if ( file_exists( $file_path ) && ! file_exists( $backup_path ) ) {
+        copy( $file_path, $backup_path );
+    }
 
     if ( move_uploaded_file( $_FILES['audio']['tmp_name'], $file_path ) ) {
-        wp_send_json_success( 'Ediciones guardadas correctamente' );
+        wp_send_json_success( array(
+            'message' => 'Ediciones guardadas correctamente',
+            'has_backup' => true
+        ) );
     } else {
         wp_send_json_error( 'Error al guardar las ediciones' );
     }
 }
 add_action( 'wp_ajax_voiceqwen_save_edited_audio', 'voiceqwen_save_edited_audio' );
+
+/**
+ * AJAX Handler: Restore original file.
+ */
+function voiceqwen_restore_original() {
+    check_ajax_referer( 'voiceqwen_nonce', 'nonce' );
+    if ( ! is_user_logged_in() ) wp_send_json_error( 'No autorizado' );
+
+    $filename = sanitize_file_name( $_POST['filename'] );
+    if ( empty( $filename ) ) wp_send_json_error( 'Nombre inválido' );
+
+    $current_user = wp_get_current_user();
+    $username = $current_user->user_login;
+    $upload_dir = wp_upload_dir();
+    $user_dir = $upload_dir['basedir'] . '/voiceqwen/' . $username;
+    $file_path = $user_dir . '/' . $filename;
+    $backup_path = $file_path . '.original.wav';
+
+    if ( file_exists( $backup_path ) ) {
+        if ( copy( $backup_path, $file_path ) ) {
+            wp_send_json_success( 'Restaurado correctamente' );
+        } else {
+            wp_send_json_error( 'Error al copiar el backup' );
+        }
+    } else {
+        wp_send_json_error( 'No existe backup para este archivo' );
+    }
+}
+add_action( 'wp_ajax_voiceqwen_restore_original', 'voiceqwen_restore_original' );
 

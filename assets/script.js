@@ -4,6 +4,10 @@ jQuery(document).ready(function ($) {
     let wsRegions = null;
     let activeFileUrl = '';
     let activeFileName = '';
+    let currentWaveUrl = '';
+    let waveUndoStack = []; // Now stores AudioBuffers
+    let activeAudioBuffer = null; // The high-quality master source
+    let audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 44100 });
 
     // Initial load is handled at the bottom of the file to ensure everything is defined.
 
@@ -539,7 +543,7 @@ jQuery(document).ready(function ($) {
                             $li.addClass('active-file');
                             activeFileUrl = item.url;
                             activeFileName = item.name;
-                            loadWaveform(item.url, item.name);
+                            loadWaveform(item.url, item.name, item.has_backup);
                         } else {
                             playAudio(item.url, item.name);
                         }
@@ -648,6 +652,9 @@ jQuery(document).ready(function ($) {
     }
 
     function setupDropZone($el) {
+        $el.on('dragenter', function(e) {
+            e.preventDefault();
+        });
         $el.on('dragover', function(e) {
             e.preventDefault();
             $(this).addClass('drop-hover');
@@ -660,10 +667,49 @@ jQuery(document).ready(function ($) {
             e.stopPropagation();
             $(this).removeClass('drop-hover');
             
-            const itemRel = e.originalEvent.dataTransfer.getData('text/plain');
             const targetFolder = $(this).hasClass('root-drop-zone') ? '' : ($(this).closest('.folder-item').data('rel') || '');
             
-            if (itemRel === targetFolder) return;
+            // Check for OS files
+            if (e.originalEvent.dataTransfer.files && e.originalEvent.dataTransfer.files.length > 0) {
+                const file = e.originalEvent.dataTransfer.files[0];
+                if (!file.name.toLowerCase().endsWith('.wav')) {
+                    alert('Solo se permiten archivos .wav');
+                    return;
+                }
+                
+                const formData = new FormData();
+                formData.append('action', 'voiceqwen_upload_os_file');
+                formData.append('nonce', voiceqwen_ajax.nonce);
+                formData.append('file', file);
+                formData.append('target_folder', targetFolder);
+                
+                const originalText = $(this).text();
+                $(this).text('Subiendo...'); // Update UI
+                
+                $.ajax({
+                    url: voiceqwen_ajax.url,
+                    type: 'POST',
+                    data: formData,
+                    processData: false,
+                    contentType: false,
+                    success: function(res) {
+                        if (res.success) {
+                            loadFileList();
+                        } else {
+                            alert(res.data);
+                            loadFileList();
+                        }
+                    },
+                    error: function() {
+                        alert('Error al subir el archivo');
+                        loadFileList();
+                    }
+                });
+                return;
+            }
+
+            const itemRel = e.originalEvent.dataTransfer.getData('text/plain');
+            if (itemRel === targetFolder || !itemRel) return;
             
             if (targetFolder !== '' && targetFolder.startsWith(itemRel + '/')) {
                 alert("No puedes mover una carpeta dentro de sí misma.");
@@ -977,12 +1023,35 @@ jQuery(document).ready(function ($) {
     });
 
     // WaveSurfer Logic
-    function loadWaveform(url, filename) {
+    async function loadWaveform(url, filename, hasBackup = false) {
+        currentWaveUrl = url;
+        waveUndoStack = [];
+        $('#wave-undo').addClass('hidden').text('UNDO (0)');
+        
+        if (hasBackup) {
+            $('#wave-restore').removeClass('hidden');
+        } else {
+            $('#wave-restore').addClass('hidden');
+        }
+
         $('#wave-viewer-empty').addClass('hidden');
         $('#wave-viewer-container').addClass('hidden');
         $('#wave-viewer-loading').removeClass('hidden');
         $('#waveform-title').text(filename);
         $('#wave-save').addClass('hidden'); // Reset save button
+
+        // 1. Fetch and Decode into Master Buffer for lossless editing
+        try {
+            const response = await fetch(url);
+            const arrayBuffer = await response.arrayBuffer();
+            activeAudioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+        } catch (e) {
+            console.error("Decoding error:", e);
+            alert("Error al cargar el audio original.");
+            $('#wave-viewer-loading').addClass('hidden');
+            $('#wave-viewer-empty').removeClass('hidden');
+            return;
+        }
 
         if (wavesurfer) {
             wavesurfer.destroy();
@@ -1000,11 +1069,24 @@ jQuery(document).ready(function ($) {
             barWidth: 2,
             barRadius: 3,
             height: 150,
-            hideScrollbar: true,
-            normalize: true,
+            hideScrollbar: false,
+            normalize: false,
             interact: true,
             fillParent: true,
-            plugins: [wsRegions]
+            plugins: [
+                wsRegions,
+                WaveSurfer.Timeline.create({
+                    container: '#wave-timeline',
+                    height: 20,
+                    timeInterval: 1, // Optional: customize the scale
+                    primaryLabelInterval: 10,
+                    secondaryLabelInterval: 5,
+                    style: {
+                        fontSize: '10px',
+                        color: '#888'
+                    }
+                })
+            ]
         });
 
         // Enable region selection on drag
@@ -1012,35 +1094,18 @@ jQuery(document).ready(function ($) {
             color: 'rgba(255, 0, 255, 0.2)',
         });
 
-        // Floating Delete Button Logic
+        // Get static delete button
         let $deleteBtn = $('#wave-region-delete');
-        if ($deleteBtn.length === 0) {
-            $deleteBtn = $('<button id="wave-region-delete" class="vapor-floating-btn hidden">DELETE</button>');
-            $('#waveform').css('position', 'relative').append($deleteBtn);
-        }
 
         wsRegions.on('region-created', (region) => {
-            // Clear other regions if needed (only one selection)
+            // Keep only one region active
             wsRegions.getRegions().forEach(r => {
                 if (r !== region) r.remove();
             });
         });
 
         wsRegions.on('region-updated', (region) => {
-            const container = wavesurfer.getWrapper();
-            const width = container.clientWidth;
-            
-            // Calculate relative position within the container
-            const startX = (region.start / wavesurfer.getDuration()) * width;
-            const endX = (region.end / wavesurfer.getDuration()) * width;
-            const centerX = (startX + endX) / 2;
-
-            $deleteBtn.removeClass('hidden').css({
-                top: '10px', // Fixed distance from top of waveform
-                left: centerX + 'px',
-                transform: 'translateX(-50%)',
-                position: 'absolute'
-            }).off('click').on('click', function(e) {
+            $deleteBtn.removeClass('hidden').off('click').on('click', function(e) {
                 e.stopPropagation();
                 deleteSegment(region.start, region.end);
                 region.remove();
@@ -1048,15 +1113,24 @@ jQuery(document).ready(function ($) {
             });
         });
 
-        // Hide delete button when clicking elsewhere
-        wavesurfer.on('interaction', () => {
-             $deleteBtn.addClass('hidden');
+        // Hide delete button when clicking elsewhere safely
+        wavesurfer.on('click', () => {
              wsRegions.clearRegions();
+             $deleteBtn.addClass('hidden');
         });
 
         wavesurfer.on('ready', function() {
             $('#wave-viewer-loading').addClass('hidden');
             $('#wave-viewer-container').removeClass('hidden');
+
+            // Initialize Zoom
+            const $zoomSlider = $('#wave-zoom');
+            if ($zoomSlider.length) {
+                wavesurfer.zoom(Number($zoomSlider.val()));
+                $zoomSlider.off('input').on('input', function(e) {
+                    wavesurfer.zoom(Number(e.target.value));
+                });
+            }
         });
 
         wavesurfer.on('error', function(err) {
@@ -1083,78 +1157,134 @@ jQuery(document).ready(function ($) {
         }
     });
 
-    $(document).on('click', '#wave-save', function() {
-        if (!wavesurfer) return;
-        const buffer = wavesurfer.getDecodedData();
-        if (!buffer) return;
+    $(document).on('click', '#wave-undo', function() {
+        if (waveUndoStack.length > 0) {
+            // Restore actual AudioBuffer data
+            activeAudioBuffer = waveUndoStack.pop();
+            
+            // Re-render Preview
+            const blob = audioBufferToWav(activeAudioBuffer);
+            currentWaveUrl = URL.createObjectURL(blob);
+            wavesurfer.load(currentWaveUrl);
+            
+            if (waveUndoStack.length === 0) {
+                $(this).addClass('hidden');
+            }
+            $(this).text(`UNDO (${waveUndoStack.length})`);
+        }
+    });
 
-        const wavBlob = audioBufferToWav(buffer);
-        const formData = new FormData();
-        formData.append('action', 'voiceqwen_save_edited_audio');
-        formData.append('nonce', voiceqwen_ajax.nonce);
-        formData.append('filename', activeFileName);
-        formData.append('audio', wavBlob, activeFileName);
-
-        const $btn = $(this);
-        $btn.prop('disabled', true).text('SAVING...');
-
-        $.ajax({
-            url: voiceqwen_ajax.url,
-            type: 'POST',
-            data: formData,
-            processData: false,
-            contentType: false,
-            success: function(response) {
-                if (response.success) {
-                    alert('¡Cambios guardados con éxito!');
-                    $btn.addClass('hidden');
-                } else {
-                    alert('Error al guardar: ' + response.data);
-                }
-                $btn.prop('disabled', false).text('SAVE EDITS');
-            },
-            error: function() {
-                alert('Error de red al guardar.');
-                $btn.prop('disabled', false).text('SAVE EDITS');
+    $(document).on('click', '#wave-restore', function() {
+        if (!confirm('¿Restaurar a la versión original generada? Se perderán todos los recortes realizados.')) return;
+        
+        $.post(voiceqwen_ajax.url, {
+            action: 'voiceqwen_restore_original',
+            nonce: voiceqwen_ajax.nonce,
+            filename: activeFileName
+        }, function(res) {
+            if (res.success) {
+                // Reload the waveform with the original URL (bypass cache by adding timestamp)
+                const freshUrl = activeFileUrl + '?t=' + new Date().getTime();
+                loadWaveform(freshUrl, activeFileName, false);
+                alert('Restaurado correctamente.');
+            } else {
+                alert('Error al restaurar: ' + res.data);
             }
         });
     });
 
-    function deleteSegment(start, end) {
-        const originalBuffer = wavesurfer.getDecodedData();
-        const frameStart = Math.floor(start * originalBuffer.sampleRate);
-        const frameEnd = Math.floor(end * originalBuffer.sampleRate);
-        const frameCount = originalBuffer.length - (frameEnd - frameStart);
+    $(document).on('click', '#wave-save', async function() {
+        if (!activeAudioBuffer) return;
 
-        const newBuffer = new AudioContext().createBuffer(
-            originalBuffer.numberOfChannels,
+        const $btn = $(this);
+        $btn.prop('disabled', true).text('SAVING...');
+
+        try {
+            // Encode the current Master Buffer directly (Lossless from memory)
+            const wavBlob = audioBufferToWav(activeAudioBuffer);
+
+            const formData = new FormData();
+            formData.append('action', 'voiceqwen_save_edited_audio');
+            formData.append('nonce', voiceqwen_ajax.nonce);
+            formData.append('filename', activeFileName);
+            formData.append('audio', wavBlob, activeFileName);
+
+            $.ajax({
+                url: voiceqwen_ajax.url,
+                type: 'POST',
+                data: formData,
+                processData: false,
+                contentType: false,
+                success: function(response) {
+                    if (response.success) {
+                        alert('¡Cambios guardados con éxito!');
+                        $btn.addClass('hidden');
+                        if (response.data.has_backup) {
+                            $('#wave-restore').removeClass('hidden');
+                        }
+                    } else {
+                        alert('Error al guardar: ' + response.data);
+                    }
+                    $btn.prop('disabled', false).text('SAVE EDITS');
+                },
+                error: function() {
+                    alert('Error de red al guardar.');
+                    $btn.prop('disabled', false).text('SAVE EDITS');
+                }
+            });
+        } catch(e) {
+            alert('Error de procesamiento local.');
+            $btn.prop('disabled', false).text('SAVE EDITS');
+        }
+    });
+
+    function deleteSegment(start, end) {
+        if (!activeAudioBuffer) return;
+
+        const frameStart = Math.floor(start * activeAudioBuffer.sampleRate);
+        const frameEnd = Math.floor(end * activeAudioBuffer.sampleRate);
+        const frameCount = activeAudioBuffer.length - (frameEnd - frameStart);
+
+        if (frameCount <= 0) return;
+
+        // Push current high-quality buffer to Undo Stack
+        waveUndoStack.push(activeAudioBuffer);
+
+        // Create new AudioBuffer from sliced data
+        const newBuffer = audioCtx.createBuffer(
+            activeAudioBuffer.numberOfChannels,
             frameCount,
-            originalBuffer.sampleRate
+            activeAudioBuffer.sampleRate
         );
 
-        for (let i = 0; i < originalBuffer.numberOfChannels; i++) {
-            const chanData = originalBuffer.getChannelData(i);
+        for (let i = 0; i < activeAudioBuffer.numberOfChannels; i++) {
+            const chanData = activeAudioBuffer.getChannelData(i);
             const newChanData = newBuffer.getChannelData(i);
             
-            // Copy part 1 (before deletion)
+            // Slice 1: Before cut
             newChanData.set(chanData.subarray(0, frameStart));
-            // Copy part 2 (after deletion)
+            
+            // Slice 2: After cut
             newChanData.set(chanData.subarray(frameEnd), frameStart);
         }
 
-        // Update WaveSurfer with the new buffer (v7 style)
-        const blob = audioBufferToWav(newBuffer);
+        // Update Master Buffer
+        activeAudioBuffer = newBuffer;
+
+        // Generate Preview for WaveSurfer
+        const blob = audioBufferToWav(activeAudioBuffer);
         const url = URL.createObjectURL(blob);
+        currentWaveUrl = url;
         
-        // Use the active filename as fallback if needed for metadata
         wavesurfer.load(url);
         $('#wave-save').removeClass('hidden'); // Show save button after edit
+        $('#wave-undo').removeClass('hidden').text(`UNDO (${waveUndoStack.length})`);
     }
 
-    // Helper: AudioBuffer to WAV Blob
+    // Helper: AudioBuffer to Standard 16-bit PCM WAV Blob
     function audioBufferToWav(buffer) {
         let numOfChan = buffer.numberOfChannels,
-            length = buffer.length * numOfChan * 2 + 44,
+            length = buffer.length * numOfChan * 2 + 44, // 2 bytes for 16-bit
             bufferArr = new ArrayBuffer(length),
             view = new DataView(bufferArr),
             channels = [], i, sample,
@@ -1178,25 +1308,24 @@ jQuery(document).ready(function ($) {
 
         setUint32(0x20746d66);                         // "fmt " chunk
         setUint32(16);                                 // length = 16
-        setUint16(1);                                  // PCM (uncompressed)
+        setUint16(1);                                  // 1 = PCM (uncompressed)
         setUint16(numOfChan);
-        setUint32(buffer.sampleRate);
-        setUint32(buffer.sampleRate * 2 * numOfChan);  // avg. bytes/sec
+        setUint32(Math.round(buffer.sampleRate));
+        setUint32(Math.round(buffer.sampleRate) * 2 * numOfChan);  // avg. bytes/sec
         setUint16(numOfChan * 2);                      // block-align
         setUint16(16);                                 // 16-bit
 
         setUint32(0x61746164);                         // "data" - chunk
         setUint32(length - pos - 4);                   // chunk length
 
-        // write interleaved data
         for(i = 0; i < buffer.numberOfChannels; i++)
             channels.push(buffer.getChannelData(i));
 
         while(pos < length) {
-            for(i = 0; i < numOfChan; i++) {             // interleave channels
+            for(i = 0; i < numOfChan; i++) {
                 sample = Math.max(-1, Math.min(1, channels[i][offset])); // clamp
                 sample = (sample < 0 ? sample * 0x8000 : sample * 0x7FFF); // scale to 16-bit signed int
-                view.setInt16(pos, sample, true);          // write 16-bit sample
+                view.setInt16(pos, sample, true); 
                 pos += 2;
             }
             offset++;
