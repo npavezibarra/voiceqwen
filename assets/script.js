@@ -555,13 +555,6 @@ jQuery(document).ready(function ($) {
                         renderCurrentPath();
                     });
 
-                    // Context menu for Folders
-                    $folderRow.on('contextmenu', '.folder-item-row', function (e) {
-                        e.preventDefault();
-                        showContextMenu(e, item.rel_path, true); // true = isFolder
-                    });
-
-                    setupDropZone($folderRow.find('.folder-item-row'));
                     $list.append($folderRow);
                 } else {
                     const $li = $(`<li class="file-item" draggable="true" data-filename="${item.name}" data-rel="${item.rel_path}" data-url="${item.url}">
@@ -585,11 +578,6 @@ jQuery(document).ready(function ($) {
                         }
                     });
 
-                    // Context menu for Files
-                    $li.on('contextmenu', function (e) {
-                        e.preventDefault();
-                        showContextMenu(e, item.rel_path, false);
-                    });
 
                     // Delete handler (trash icon)
                     $li.on('click', '.trash-btn', function(e) {
@@ -785,23 +773,43 @@ jQuery(document).ready(function ($) {
         });
     });
 
-    // Prevent default context menu on CTRL+Click
+    // Context Menu Delegation
     $(document).on('contextmenu', '.file-item', function (e) {
-        if (e.ctrlKey) e.preventDefault();
+        const relPath = $(this).data('rel');
+        if (!relPath) return;
+        e.preventDefault();
+        showContextMenu(e, relPath, false);
+    });
+
+    $(document).on('contextmenu', '.folder-item-row', function (e) {
+        const $li = $(this).closest('.folder-item');
+        const relPath = $li.data('rel');
+        if (!relPath) return;
+        e.preventDefault();
+        showContextMenu(e, relPath, true);
+    });
+
+    // Close menu on click anywhere
+    $(document).on('click', function (e) {
+        if (!$(e.target).closest('.vapor-context-menu').length) {
+            $('.vapor-context-menu').remove();
+        }
     });
 
     function showContextMenu(e, relPath, isFolder = false) {
         $('.vapor-context-menu').remove();
+        const $wrapper = $('.voiceqwen-main-wrapper');
         const $menu = $('<div class="vapor-context-menu"></div>');
-        $menu.append('<div class="menu-rename">Rename</div>');
-        $menu.append('<div class="menu-delete">Delete</div>');
+        $menu.append('<div class="menu-rename">RENOMBRAR</div>');
+        $menu.append('<div class="menu-delete">BORRAR</div>');
 
+        const offset = $wrapper.offset();
         $menu.css({
-            top: e.pageY,
-            left: e.pageX
+            top: e.pageY - offset.top,
+            left: e.pageX - offset.left
         });
 
-        $('body').append($menu);
+        $wrapper.append($menu);
 
         $menu.on('click', '.menu-delete', function () {
             $menu.remove();
@@ -813,10 +821,6 @@ jQuery(document).ready(function ($) {
         $menu.on('click', '.menu-rename', function () {
             $menu.remove();
             renameFilePrompt(relPath, isFolder);
-        });
-
-        $(document).one('click', function () {
-            $menu.remove();
         });
     }
 
