@@ -308,7 +308,8 @@ function voiceqwen_ui_shortcode() {
                         </div>
                         <div id="wave-viewer-container" class="hidden">
                             <div id="waveform-title" style="margin-bottom: 10px; font-weight: bold; color: #ff00ff; font-size: 20px;"></div>
-                            <div id="waveform" style="background: #0d0d2b; border: 3px solid #0000ff; margin-bottom: 5px;"></div>
+                            <div id="waveform" style="background: #0d0d2b; border: 3px solid #0000ff; margin-bottom: 5px; position: relative; min-height: 128px;"></div>
+
                             <div id="wave-timeline" style="margin-bottom: 15px; font-size: 10px; color: #888;"></div>
                             <div id="wave-controls" style="display: flex; gap: 15px; align-items: center; justify-content: center; padding: 10px; background: rgba(0,0,255,0.05); border: 2px solid #0000ff; flex-wrap: wrap;">
                                 <button id="wave-play" type="button" class="nav-btn wave-control-btn" style="width: auto; margin: 0; min-width: 80px;">PLAY</button>
@@ -332,6 +333,30 @@ function voiceqwen_ui_shortcode() {
                 <div class="vapor-deco-text"><?php echo esc_html( $deco_text ); ?></div>
             <?php endif; ?>
 
+    </div>
+    
+    <!-- Add Speech Mini Modal - TRULY FLOATING (OUTSIDE VIEWERS) -->
+    <div id="wave-mini-modal" class="vapor-window mini-modal hidden">
+        <div class="vapor-window-header mini-header">
+            <div class="vapor-dots"><span></span><span></span><span></span></div>
+            <div class="vapor-window-title mini-title">ADD SPEECH</div>
+            <button id="mini-modal-close" class="mini-close">×</button>
+        </div>
+        <div class="vapor-pane mini-pane">
+            <label class="mini-label">VOICE:</label>
+            <div id="mini-voice-selector" class="mini-voice-list">
+                <!-- Populated via JS -->
+            </div>
+            
+            <textarea id="mini-text" placeholder="Escribe el texto a insertar..."></textarea>
+            
+            <div class="stability-control-mini">
+                <label class="mini-label">ESTABILIDAD: <span id="mini-stability-val">0.7</span></label>
+                <input type="range" id="mini-stability" min="0.1" max="1.0" step="0.1" value="0.7">
+            </div>
+            
+            <button id="mini-generate-btn" class="vapor-btn-main mini-btn">GENERATE & INSERT</button>
+            <div id="mini-status" class="mini-status-text"></div>
         </div>
     </div>
     <?php

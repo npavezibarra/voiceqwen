@@ -251,6 +251,24 @@ jQuery(document).ready(function ($) {
                         $chips.append($chip);
                     }
                 });
+
+                // Also populate Mini Selector if it exists
+                const $miniSelector = $('#mini-voice-selector');
+                if ($miniSelector.length) {
+                    $miniSelector.empty();
+                    response.data.forEach(function(voice, index) {
+                        const checked = index === 0 ? 'checked' : '';
+                        const html = `
+                            <label class="avatar-radio mini">
+                                <input type="radio" name="mini-voice" value="${voice.id}" ${checked} style="display:none;">
+                                <div class="avatar-circle" style="background-image: url('${voice.avatar}');">
+                                </div>
+                                <span class="avatar-name">${voice.name}</span>
+                            </label>
+                        `;
+                        $miniSelector.append(html);
+                    });
+                }
             }
         });
     }
@@ -383,7 +401,6 @@ jQuery(document).ready(function ($) {
                     const secondsPerSegment = elapsed / completedSegments;
                     const remainingSegments = totalSegments - completedSegments;
                     const etaSeconds = Math.floor(secondsPerSegment * remainingSegments);
-                    
                     if (etaSeconds > 0) {
                         const etaMins = Math.floor(etaSeconds / 60);
                         const etaSecs = etaSeconds % 60;
@@ -1132,6 +1149,158 @@ jQuery(document).ready(function ($) {
                 });
             }
         });
+
+        // Add Speech - Context Menu logic
+        let lastInsertTime = 0;
+        $(document).on('contextmenu', '#waveform', function(e) {
+            e.preventDefault();
+            if (!activeAudioBuffer) return;
+
+            // Using Viewport coordinates for FIXED positioning
+            const x = e.clientX;
+            const y = e.clientY;
+            
+            const $waveform = $(this);
+            const waveOffset = $waveform.offset();
+            const waveX = e.pageX - waveOffset.left;
+            const width = $waveform.width();
+            lastInsertTime = (waveX / width) * wavesurfer.getDuration();
+
+            // Boundary checks to keep modal inside the viewport
+            let finalX = x;
+            let finalY = y;
+            if (finalX + 330 > window.innerWidth) finalX = window.innerWidth - 340;
+            if (finalY + 450 > window.innerHeight) finalY = window.innerHeight - 460;
+
+            // Position and show modal
+            $('#wave-mini-modal').removeClass('hidden').css({
+                left: Math.max(0, finalX) + 'px',
+                top: Math.max(0, finalY) + 'px'
+            });
+            $('#mini-status').text('');
+            $('#mini-text').val('').focus();
+        });
+
+        $(document).on('click', '#mini-modal-close', function() {
+            $('#wave-mini-modal').addClass('hidden');
+        });
+
+        $(document).on('input', '#mini-stability', function() {
+            $('#mini-stability-val').text($(this).val());
+        });
+
+        $(document).on('click', '#mini-generate-btn', async function() {
+            const voice = $('input[name="mini-voice"]:checked').val();
+            const text = $('#mini-text').val();
+            const stability = $('#mini-stability').val();
+            const $btn = $(this);
+            const $status = $('#mini-status');
+
+            if (!text) {
+                alert("Escribe algo para insertar.");
+                return;
+            }
+
+            $btn.prop('disabled', true).text('GENERATING...');
+            $status.text('Solicitando audio...');
+
+            const formData = new FormData();
+            formData.append('action', 'voiceqwen_generate_audio');
+            formData.append('nonce', voiceqwen_ajax.nonce);
+            formData.append('voice', voice);
+            formData.append('stability', stability);
+            formData.append('text', text);
+
+            $.ajax({
+                url: voiceqwen_ajax.url,
+                type: 'POST',
+                data: formData,
+                processData: false,
+                contentType: false,
+                success: function(res) {
+                    if (res.success && res.data.status === 'processing') {
+                        $status.text('Generando (polling)...');
+                        pollMiniInsertion(res.data.file_url, $btn, $status);
+                    } else {
+                        $status.text('Error: ' + res.data);
+                        $btn.prop('disabled', false).text('GENERATE & INSERT');
+                    }
+                },
+                error: function() {
+                    $status.text('Error de red.');
+                    $btn.prop('disabled', false).text('GENERATE & INSERT');
+                }
+            });
+        });
+
+        async function pollMiniInsertion(fileUrl, $btn, $status) {
+            const check = async () => {
+                try {
+                    const response = await fetch(fileUrl, { method: 'HEAD' });
+                    if (response.ok) {
+                        $status.text('Insertando en la onda...');
+                        await handleInsertion(fileUrl);
+                        $('#wave-mini-modal').addClass('hidden');
+                        $btn.prop('disabled', false).text('GENERATE & INSERT');
+                    } else {
+                        setTimeout(check, 2000);
+                    }
+                } catch (e) {
+                    setTimeout(check, 2000);
+                }
+            };
+            check();
+        }
+
+        async function handleInsertion(url) {
+            try {
+                // Fetch and decode the new clip
+                const response = await fetch(url);
+                const arrayBuffer = await response.arrayBuffer();
+                const insertBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+
+                // Perform the insertion
+                const newBuffer = await insertAudioAt(activeAudioBuffer, insertBuffer, lastInsertTime);
+                
+                // Push current to undo
+                waveUndoStack.push(activeAudioBuffer);
+                activeAudioBuffer = newBuffer;
+
+                // Update UI
+                const blob = audioBufferToWav(activeAudioBuffer);
+                const blobUrl = URL.createObjectURL(blob);
+                currentWaveUrl = blobUrl;
+                wavesurfer.load(blobUrl);
+
+                $('#wave-save').removeClass('hidden');
+                $('#wave-undo').removeClass('hidden').text(`UNDO (${waveUndoStack.length})`);
+                alert("¡Audio insertado correctamente!");
+            } catch (e) {
+                console.error("Insertion error:", e);
+                alert("Error al insertar el fragmento de audio.");
+            }
+        }
+
+        async function insertAudioAt(orig, insert, time) {
+            const sampleRate = orig.sampleRate;
+            const frameStart = Math.floor(time * sampleRate);
+            const newLength = orig.length + insert.length;
+            const newBuffer = audioCtx.createBuffer(orig.numberOfChannels, newLength, sampleRate);
+
+            for (let i = 0; i < orig.numberOfChannels; i++) {
+                const chan = newBuffer.getChannelData(i);
+                const origChan = orig.getChannelData(i);
+                const insertChan = i < insert.numberOfChannels ? insert.getChannelData(i) : insert.getChannelData(0); // fallback if mono
+
+                // 1. Before insert
+                chan.set(origChan.subarray(0, frameStart));
+                // 2. Insert
+                chan.set(insertChan, frameStart);
+                // 3. After insert
+                chan.set(origChan.subarray(frameStart), frameStart + insert.length);
+            }
+            return newBuffer;
+        }
 
         wavesurfer.on('error', function(err) {
             alert('Error cargando la onda: ' + err);
