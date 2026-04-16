@@ -8,6 +8,14 @@ jQuery(document).ready(function ($) {
     let waveUndoStack = []; // Now stores AudioBuffers
     let activeAudioBuffer = null; // The high-quality master source
     let audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 44100 });
+    let currentJobSource = ''; // 'create', 'dialogue', or 'mini'
+    let currentJobFileUrl = '';
+    let lastInsertTime = 0;
+    
+    // Mini-modal Draggable state
+    let isDraggingMini = false;
+    let dragStartX, dragStartY;
+    let modalStartX, modalStartY;
 
     // Initial load is handled at the bottom of the file to ensure everything is defined.
 
@@ -52,6 +60,7 @@ jQuery(document).ready(function ($) {
 
         $btn.prop('disabled', true).text('Procesando...');
         $status.text('Iniciando proceso en segundo plano...').css('color', '#000');
+        currentJobSource = 'create';
 
         $.ajax({
             url: voiceqwen_ajax.url,
@@ -96,6 +105,7 @@ jQuery(document).ready(function ($) {
 
         $btn.prop('disabled', true).text('Procesando...');
         $status.text('Iniciando diálogo en segundo plano...').css('color', '#000');
+        currentJobSource = 'dialogue';
 
         $.ajax({
             url: voiceqwen_ajax.url,
@@ -341,9 +351,12 @@ jQuery(document).ready(function ($) {
             action: 'voiceqwen_check_status',
             nonce: voiceqwen_ajax.nonce
         }, function (response) {
-            const $status = $('#status-msg');
             const $btn = $('#generate-btn');
             const $reset = $('#reset-status-btn');
+
+            let $targetStatus = $('#status-msg');
+            if (currentJobSource === 'dialogue') $targetStatus = $('#dialogue-status-msg');
+            if (currentJobSource === 'mini') $targetStatus = $('#mini-status');
 
             if (response.success && response.data.status === 'processing') {
                 const details = response.data.details;
@@ -407,20 +420,19 @@ jQuery(document).ready(function ($) {
                         etaStr = `<div style="color:#000; font-weight:bold; margin:10px 0; background: rgba(0,255,255,0.05); padding: 8px; border-left: 4px solid #0000ff; border-top: 1px solid #0000ff; border-right: 1px solid #0000ff; border-bottom: 5px solid #0000ff;">🕒 TIEMPO RESTANTE ESTIMADO: ${etaMins}m ${etaSecs}s</div>`;
                     }
                 } else if (totalSegments > 1) {
-                    // During the very first fragment
-                    etaStr = `<div style="color:#666; font-style:italic; margin:10px 0; padding: 5px; border-left: 3px solid #ccc;">🕒 Calculando tiempo restante... (esperando completar primer segmento)</div>`;
+                    etaStr = `<div style="color:#666; font-style:italic; margin:10px 0; padding: 5px; border-left: 3px solid #ccc;">🕒 Calculando tiempo restante...</div>`;
                 }
 
                 const currentFrag = details.current || "...";
                 const totalFrags = details.total || "...";
-                const displayMsg = details.message || (details.current ? `Procesando fragmento ${details.current}` : "Iniciando sistema y cargando modelo...");
+                const displayMsg = details.message || (details.current ? `Procesando fragmento ${details.current}` : "Iniciando sistema...");
 
-                $status.show().html(`
-                    <div style="background:#0000ff; color:#fff; padding:5px 10px; margin-bottom:10px; font-weight:bold; display:flex; justify-content:space-between;">
+                const richHtml = `
+                    <div style="background:#0000ff; color:#fff; padding:5px 10px; margin-bottom:10px; font-weight:bold; display:flex; justify-content:space-between; font-size: 14px;">
                         <span>${statusEmoji} ESTADO DEL PROCESO</span>
                         <span>FRAGMENTO ${currentFrag} de ${totalFrags}</span>
                     </div>
-                    <div style="border:2px solid #0000ff; padding:15px; background:rgba(0,0,255,0.02);">
+                    <div style="border:2px solid #0000ff; padding:15px; background:rgba(0,0,255,0.02); font-size: 14px;">
                         <div style="color:${statusColor}; font-weight:bold; font-size:1.1em; margin-bottom: 10px;">
                             ${statusEmoji} ${displayMsg.toUpperCase()}
                         </div>
@@ -430,32 +442,39 @@ jQuery(document).ready(function ($) {
                             <b>Tiempo transcurrido:</b> ${timeStr}
                         </div>
                     </div>
-                `);
-                
-                // Update dialogue status too if it's the one active
-                $('#dialogue-status-msg').show().html($status.html());
+                `;
 
-                $btn.prop('disabled', true).text('Procesando...');
+                $targetStatus.show().html(richHtml);
+
+                // Disable appropriate button
+                if (currentJobSource === 'create') $btn.prop('disabled', true).text('Procesando...');
+                if (currentJobSource === 'dialogue') $('#generate-dialogue-btn').prop('disabled', true).text('Procesando...');
+                if (currentJobSource === 'mini') $('#mini-generate-btn').prop('disabled', true).text('GENERATING...');
+
                 $reset.removeClass('hidden');
-                
-                // Start polling if not already started
                 if (!pollingInterval) startPolling();
             } else {
-                // If not processing (completed, error, or never started)
-                // Stop polling if active
                 if (pollingInterval) {
                     clearInterval(pollingInterval);
                     pollingInterval = null;
                 }
                 
-                // Reset UI only if it was showing processing
-                if ($btn.text() === 'Procesando...') {
-                    $status.text('¡Proceso finalizado!').css('color', 'green');
-                    $btn.prop('disabled', false).text('Generar Audio');
+                if ($btn.text() === 'Procesando...' || $('#generate-dialogue-btn').text() === 'Procesando...' || $('#mini-generate-btn').text() === 'GENERATING...') {
                     
-                    // Also reset dialogue button if it was active
-                    $('#generate-dialogue-btn').prop('disabled', false).text('Generar Diálogo');
-                    $('#dialogue-status-msg').text('¡Diálogo listo!').css('color', 'green');
+                    if (currentJobSource === 'mini' && response.data.status === 'completed') {
+                        $targetStatus.text('¡Audio generado! Insertando...').css('color', 'green');
+                        handleInsertion(currentJobFileUrl);
+                        $('#mini-generate-btn').prop('disabled', false).text('GENERATE & INSERT');
+                        // No hide reset here because we want to finish insertion
+                    } else if (currentJobSource === 'mini') {
+                        $('#mini-generate-btn').prop('disabled', false).text('GENERATE & INSERT');
+                    } else if (currentJobSource === 'dialogue') {
+                        $('#generate-dialogue-btn').prop('disabled', false).text('Generar Diálogo');
+                        $targetStatus.text('¡Diálogo listo!').css('color', 'green');
+                    } else {
+                        $btn.prop('disabled', false).text('Generar Audio');
+                        $targetStatus.text('¡Proceso finalizado!').css('color', 'green');
+                    }
 
                     $reset.addClass('hidden');
                     loadFileList();
@@ -1150,167 +1169,171 @@ jQuery(document).ready(function ($) {
             }
         });
 
-        // Add Speech - Context Menu logic
-        let lastInsertTime = 0;
-        $(document).on('contextmenu', '#waveform', function(e) {
-            e.preventDefault();
-            if (!activeAudioBuffer) return;
-
-            // Using Viewport coordinates for FIXED positioning
-            const x = e.clientX;
-            const y = e.clientY;
-            
-            const $waveform = $(this);
-            const waveOffset = $waveform.offset();
-            const waveX = e.pageX - waveOffset.left;
-            const width = $waveform.width();
-            lastInsertTime = (waveX / width) * wavesurfer.getDuration();
-
-            // Boundary checks to keep modal inside the viewport
-            let finalX = x;
-            let finalY = y;
-            if (finalX + 330 > window.innerWidth) finalX = window.innerWidth - 340;
-            if (finalY + 450 > window.innerHeight) finalY = window.innerHeight - 460;
-
-            // Position and show modal
-            $('#wave-mini-modal').removeClass('hidden').css({
-                left: Math.max(0, finalX) + 'px',
-                top: Math.max(0, finalY) + 'px'
-            });
-            $('#mini-status').text('');
-            $('#mini-text').val('').focus();
-        });
-
-        $(document).on('click', '#mini-modal-close', function() {
-            $('#wave-mini-modal').addClass('hidden');
-        });
-
-        $(document).on('input', '#mini-stability', function() {
-            $('#mini-stability-val').text($(this).val());
-        });
-
-        $(document).on('click', '#mini-generate-btn', async function() {
-            const voice = $('input[name="mini-voice"]:checked').val();
-            const text = $('#mini-text').val();
-            const stability = $('#mini-stability').val();
-            const $btn = $(this);
-            const $status = $('#mini-status');
-
-            if (!text) {
-                alert("Escribe algo para insertar.");
-                return;
-            }
-
-            $btn.prop('disabled', true).text('GENERATING...');
-            $status.text('Solicitando audio...');
-
-            const formData = new FormData();
-            formData.append('action', 'voiceqwen_generate_audio');
-            formData.append('nonce', voiceqwen_ajax.nonce);
-            formData.append('voice', voice);
-            formData.append('stability', stability);
-            formData.append('text', text);
-
-            $.ajax({
-                url: voiceqwen_ajax.url,
-                type: 'POST',
-                data: formData,
-                processData: false,
-                contentType: false,
-                success: function(res) {
-                    if (res.success && res.data.status === 'processing') {
-                        $status.text('Generando (polling)...');
-                        pollMiniInsertion(res.data.file_url, $btn, $status);
-                    } else {
-                        $status.text('Error: ' + res.data);
-                        $btn.prop('disabled', false).text('GENERATE & INSERT');
-                    }
-                },
-                error: function() {
-                    $status.text('Error de red.');
-                    $btn.prop('disabled', false).text('GENERATE & INSERT');
-                }
-            });
-        });
-
-        async function pollMiniInsertion(fileUrl, $btn, $status) {
-            const check = async () => {
-                try {
-                    const response = await fetch(fileUrl, { method: 'HEAD' });
-                    if (response.ok) {
-                        $status.text('Insertando en la onda...');
-                        await handleInsertion(fileUrl);
-                        $('#wave-mini-modal').addClass('hidden');
-                        $btn.prop('disabled', false).text('GENERATE & INSERT');
-                    } else {
-                        setTimeout(check, 2000);
-                    }
-                } catch (e) {
-                    setTimeout(check, 2000);
-                }
-            };
-            check();
-        }
-
-        async function handleInsertion(url) {
-            try {
-                // Fetch and decode the new clip
-                const response = await fetch(url);
-                const arrayBuffer = await response.arrayBuffer();
-                const insertBuffer = await audioCtx.decodeAudioData(arrayBuffer);
-
-                // Perform the insertion
-                const newBuffer = await insertAudioAt(activeAudioBuffer, insertBuffer, lastInsertTime);
-                
-                // Push current to undo
-                waveUndoStack.push(activeAudioBuffer);
-                activeAudioBuffer = newBuffer;
-
-                // Update UI
-                const blob = audioBufferToWav(activeAudioBuffer);
-                const blobUrl = URL.createObjectURL(blob);
-                currentWaveUrl = blobUrl;
-                wavesurfer.load(blobUrl);
-
-                $('#wave-save').removeClass('hidden');
-                $('#wave-undo').removeClass('hidden').text(`UNDO (${waveUndoStack.length})`);
-                alert("¡Audio insertado correctamente!");
-            } catch (e) {
-                console.error("Insertion error:", e);
-                alert("Error al insertar el fragmento de audio.");
-            }
-        }
-
-        async function insertAudioAt(orig, insert, time) {
-            const sampleRate = orig.sampleRate;
-            const frameStart = Math.floor(time * sampleRate);
-            const newLength = orig.length + insert.length;
-            const newBuffer = audioCtx.createBuffer(orig.numberOfChannels, newLength, sampleRate);
-
-            for (let i = 0; i < orig.numberOfChannels; i++) {
-                const chan = newBuffer.getChannelData(i);
-                const origChan = orig.getChannelData(i);
-                const insertChan = i < insert.numberOfChannels ? insert.getChannelData(i) : insert.getChannelData(0); // fallback if mono
-
-                // 1. Before insert
-                chan.set(origChan.subarray(0, frameStart));
-                // 2. Insert
-                chan.set(insertChan, frameStart);
-                // 3. After insert
-                chan.set(origChan.subarray(frameStart), frameStart + insert.length);
-            }
-            return newBuffer;
-        }
-
         wavesurfer.on('error', function(err) {
             alert('Error cargando la onda: ' + err);
             $('#wave-viewer-loading').addClass('hidden');
             $('#wave-viewer-empty').removeClass('hidden');
         });
 
-        // Add a "click to seek" behavior which is default but making sure it works
         wavesurfer.load(url);
     }
+
+    // --- Add Speech Logic (Refactored out of loadWaveform) ---
+
+    $(document).on('mousedown', '.mini-header', function(e) {
+        if (e.target.id === 'mini-modal-close' || $(e.target).closest('button').length) return;
+        isDraggingMini = true;
+        const $modal = $('#wave-mini-modal');
+        dragStartX = e.pageX;
+        dragStartY = e.pageY;
+        modalStartX = parseFloat($modal.css('left')) || 0;
+        modalStartY = parseFloat($modal.css('top')) || 0;
+        $(this).css('cursor', 'grabbing');
+        e.preventDefault();
+    });
+
+    $(document).on('mousemove', function(e) {
+        if (!isDraggingMini) return;
+        const dx = e.pageX - dragStartX;
+        const dy = e.pageY - dragStartY;
+        $('#wave-mini-modal').css({
+            left: (modalStartX + dx) + 'px',
+            top: (modalStartY + dy) + 'px'
+        });
+    });
+
+    $(document).on('mouseup', function() {
+        if (isDraggingMini) {
+            isDraggingMini = false;
+            $('.mini-header').css('cursor', 'move');
+        }
+    });
+
+    $(document).on('contextmenu', '#waveform', function(e) {
+        e.preventDefault();
+        if (!activeAudioBuffer || !wavesurfer) return;
+
+        const x = e.clientX;
+        const y = e.clientY;
+        
+        const $waveform = $(this);
+        const waveOffset = $waveform.offset();
+        const waveX = e.pageX - waveOffset.left;
+        const width = $waveform.width();
+        lastInsertTime = (waveX / width) * wavesurfer.getDuration();
+
+        let finalX = x;
+        let finalY = y;
+        if (finalX + 330 > window.innerWidth) finalX = window.innerWidth - 340;
+        if (finalY + 450 > window.innerHeight) finalY = window.innerHeight - 460;
+
+        $('#wave-mini-modal').removeClass('hidden').css({
+            left: Math.max(0, finalX) + 'px',
+            top: Math.max(0, finalY) + 'px'
+        });
+        $('#mini-status').text('').hide();
+        $('#mini-text').val('').focus();
+    });
+
+    $(document).on('click', '#mini-modal-close', function() {
+        $('#wave-mini-modal').addClass('hidden');
+    });
+
+    $(document).on('input', '#mini-stability', function() {
+        $('#mini-stability-val').text($(this).val());
+    });
+
+    $(document).on('click', '#mini-generate-btn', async function() {
+        const voice = $('input[name="mini-voice"]:checked').val();
+        const text = $('#mini-text').val();
+        const stability = $('#mini-stability').val();
+        const $btn = $(this);
+        const $status = $('#mini-status');
+
+        if (!text) {
+            alert("Escribe algo para insertar.");
+            return;
+        }
+
+        $btn.prop('disabled', true).text('GENERATING...');
+        $status.show().text('Solicitando audio...');
+        currentJobSource = 'mini';
+
+        const formData = new FormData();
+        formData.append('action', 'voiceqwen_generate_audio');
+        formData.append('nonce', voiceqwen_ajax.nonce);
+        formData.append('voice', voice);
+        formData.append('stability', stability);
+        formData.append('text', text);
+
+        $.ajax({
+            url: voiceqwen_ajax.url,
+            type: 'POST',
+            data: formData,
+            processData: false,
+            contentType: false,
+            success: function(res) {
+                if (res.success && res.data.status === 'processing') {
+                    currentJobFileUrl = res.data.file_url;
+                    startPolling();
+                } else {
+                    $status.text('Error: ' + res.data);
+                    $btn.prop('disabled', false).text('GENERATE & INSERT');
+                }
+            },
+            error: function() {
+                $status.text('Error de red.');
+                $btn.prop('disabled', false).text('GENERATE & INSERT');
+            }
+        });
+    });
+
+    async function handleInsertion(url) {
+        if (!activeAudioBuffer || !wavesurfer) return;
+        try {
+            const response = await fetch(url);
+            if (!response.ok) throw new Error("File not ready");
+            const arrayBuffer = await response.arrayBuffer();
+            const insertBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+
+            const newBuffer = await insertAudioAt(activeAudioBuffer, insertBuffer, lastInsertTime);
+            
+            waveUndoStack.push(activeAudioBuffer);
+            activeAudioBuffer = newBuffer;
+
+            const blob = audioBufferToWav(activeAudioBuffer);
+            const blobUrl = URL.createObjectURL(blob);
+            currentWaveUrl = blobUrl;
+            wavesurfer.load(blobUrl);
+
+            $('#wave-save').removeClass('hidden');
+            $('#wave-undo').removeClass('hidden').text(`UNDO (${waveUndoStack.length})`);
+            $('#mini-status').text('✓ Insertado correctamente').css('color', 'green');
+            setTimeout(() => $('#wave-mini-modal').addClass('hidden'), 1500);
+        } catch (e) {
+            console.error("Insertion error:", e);
+            alert("Error al insertar el fragmento de audio.");
+        }
+    }
+
+    async function insertAudioAt(orig, insert, time) {
+        const sampleRate = orig.sampleRate;
+        const frameStart = Math.floor(time * sampleRate);
+        const newLength = orig.length + insert.length;
+        const newBuffer = audioCtx.createBuffer(orig.numberOfChannels, newLength, sampleRate);
+
+        for (let i = 0; i < orig.numberOfChannels; i++) {
+            const chan = newBuffer.getChannelData(i);
+            const origChan = orig.getChannelData(i);
+            const insertChan = i < insert.numberOfChannels ? insert.getChannelData(i) : insert.getChannelData(0);
+
+            chan.set(origChan.subarray(0, frameStart));
+            chan.set(insertChan, frameStart);
+            chan.set(origChan.subarray(frameStart), frameStart + insert.length);
+        }
+        return newBuffer;
+    }
+
 
     $(document).on('click', '#wave-play', function() {
         if (wavesurfer) wavesurfer.play();

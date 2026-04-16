@@ -530,7 +530,8 @@ function voiceqwen_generate_audio() {
     wp_send_json_success( array(
         'status'   => 'processing',
         'message'  => 'Generando en segundo plano...',
-        'filename' => $filename
+        'filename' => $filename,
+        'file_url' => $upload_dir['baseurl'] . '/voiceqwen/' . $username . '/' . $filename
     ) );
 }
 add_action( 'wp_ajax_voiceqwen_generate_audio', 'voiceqwen_generate_audio' );
@@ -638,7 +639,8 @@ function voiceqwen_generate_dialogue() {
     wp_send_json_success( array(
         'status'   => 'processing',
         'message'  => 'Generando diálogo...',
-        'filename' => $filename
+        'filename' => $filename,
+        'file_url' => $upload_dir['baseurl'] . '/voiceqwen/' . $username . '/' . $filename
     ) );
 }
 add_action( 'wp_ajax_voiceqwen_generate_dialogue', 'voiceqwen_generate_dialogue' );

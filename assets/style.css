@@ -1220,9 +1220,10 @@
 }
 
 .mini-status-text {
-    font-size: 9px;
-    margin-top: 4px;
+    font-size: 11px;
+    margin-top: 8px;
     text-align: center;
     color: #ff00ff;
-    height: 12px;
+    min-height: 20px;
+    height: auto;
 }
