@@ -1,4 +1,6 @@
 jQuery(document).ready(function ($) {
+    console.log("VoiceQwen: Script initialization started.");
+    
     let pollingInterval = null;
     let wavesurfer = null;
     let wsRegions = null;
@@ -7,7 +9,16 @@ jQuery(document).ready(function ($) {
     let currentWaveUrl = '';
     let waveUndoStack = []; // Now stores AudioBuffers
     let activeAudioBuffer = null; // The high-quality master source
-    let audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 44100 });
+    
+    // Lazy initialize AudioContext to avoid issues with blocked auto-play or early crashes
+    let audioCtx = null;
+    function getAudioCtx() {
+        if (!audioCtx) {
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 44100 });
+        }
+        return audioCtx;
+    }
+
     let currentJobSource = ''; // 'create', 'dialogue', or 'mini'
     let currentJobFileUrl = '';
     let lastInsertTime = 0;
@@ -17,7 +28,17 @@ jQuery(document).ready(function ($) {
     let dragStartX, dragStartY;
     let modalStartX, modalStartY;
 
-    // Initial load is handled at the bottom of the file to ensure everything is defined.
+    // Auto-save & Safety state
+    let autoSaveTimer = null;
+    let hasUnsavedChanges = false;
+    let isAutoSaving = false;
+
+    // Navigation Guard: Warn if unsaved changes exist
+    window.onbeforeunload = function() {
+        if (hasUnsavedChanges || waveUndoStack.length > 0) {
+            return "Tienes cambios sin guardar. ¿Estás seguro de que quieres salir?";
+        }
+    };
 
     // Tab switching
     $('.vapor-tab').on('click', function () {
@@ -193,8 +214,10 @@ jQuery(document).ready(function ($) {
     });
 
     // Navigation (View Switching)
+    console.log("VoiceQwen: Attaching menu listeners.");
     $('.vapor-nav .nav-btn').on('click', function() {
         const view = $(this).data('view');
+        console.log("VoiceQwen: Navigating to view:", view);
         if (!view) return; // Safety check
         
         $('.vapor-nav .nav-btn').removeClass('active');
@@ -211,12 +234,19 @@ jQuery(document).ready(function ($) {
     });
 
     function loadVoices() {
+        console.log("VoiceQwen: Loading voices...");
         const $selector = $('#dynamic-voice-selector');
+        if (typeof voiceqwen_ajax === 'undefined') {
+            console.error("VoiceQwen: voiceqwen_ajax is not defined!");
+            return;
+        }
+
         $.post(voiceqwen_ajax.url, {
             action: 'voiceqwen_get_voices',
             nonce: voiceqwen_ajax.nonce
         }, function(response) {
             if (response.success) {
+                console.log("VoiceQwen: Voices loaded successfully:", response.data);
                 $selector.empty();
                 const $chips = $('#dialogue-voice-chips');
                 if ($chips.length) $chips.empty();
@@ -279,7 +309,13 @@ jQuery(document).ready(function ($) {
                         $miniSelector.append(html);
                     });
                 }
+            } else {
+                console.error("VoiceQwen: Failed to load voices:", response.data);
+                $selector.html('<p style="color:red;">Error al cargar voces: ' + (response.data || 'Error desconocido') + '</p>');
             }
+        }).fail(function(xhr, status, error) {
+            console.error("VoiceQwen: AJAX Error loading voices:", status, error);
+            $selector.html('<p style="color:red;">Error de red al cargar voces.</p>');
         });
     }
 
@@ -572,7 +608,7 @@ jQuery(document).ready(function ($) {
                             $li.addClass('active-file');
                             activeFileUrl = item.url;
                             activeFileName = item.name;
-                            loadWaveform(item.url, item.name, item.has_backup);
+                            loadWaveform(item.url, item.name, item.has_backup, item.has_autosave, item.autosave_url);
                         } else {
                             playAudio(item.url, item.name);
                         }
@@ -1063,9 +1099,17 @@ jQuery(document).ready(function ($) {
     });
 
     // WaveSurfer Logic
-    async function loadWaveform(url, filename, hasBackup = false) {
+    async function loadWaveform(url, filename, hasBackup = false, hasAutosave = false, autosaveUrl = '') {
+        // Recovery Prompt
+        if (hasAutosave && autosaveUrl) {
+            if (confirm("🚨 SE DETECTARON CAMBIOS AUTOMÁTICOS\n\n¿Deseas recuperar la última sesión de edición de este archivo?\n(Si cancelas, se cargará el original)")) {
+                url = autosaveUrl;
+            }
+        }
+
         currentWaveUrl = url;
         waveUndoStack = [];
+        hasUnsavedChanges = false;
         $('#wave-undo').addClass('hidden').text('UNDO (0)');
         
         if (hasBackup) {
@@ -1084,7 +1128,7 @@ jQuery(document).ready(function ($) {
         try {
             const response = await fetch(url);
             const arrayBuffer = await response.arrayBuffer();
-            activeAudioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+            activeAudioBuffer = await getAudioCtx().decodeAudioData(arrayBuffer);
         } catch (e) {
             console.error("Decoding error:", e);
             alert("Error al cargar el audio original.");
@@ -1298,12 +1342,14 @@ jQuery(document).ready(function ($) {
             const response = await fetch(url);
             if (!response.ok) throw new Error("File not ready");
             const arrayBuffer = await response.arrayBuffer();
-            const insertBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+            const insertBuffer = await getAudioCtx().decodeAudioData(arrayBuffer);
 
             const newBuffer = await insertAudioAt(activeAudioBuffer, insertBuffer, lastInsertTime);
             
             waveUndoStack.push(activeAudioBuffer);
             activeAudioBuffer = newBuffer;
+            hasUnsavedChanges = true;
+            requestAutoSave();
 
             const blob = audioBufferToWav(activeAudioBuffer);
             const blobUrl = URL.createObjectURL(blob);
@@ -1324,7 +1370,7 @@ jQuery(document).ready(function ($) {
         const sampleRate = orig.sampleRate;
         const frameStart = Math.floor(time * sampleRate);
         const newLength = orig.length + insert.length;
-        const newBuffer = audioCtx.createBuffer(orig.numberOfChannels, newLength, sampleRate);
+        const newBuffer = getAudioCtx().createBuffer(orig.numberOfChannels, newLength, sampleRate);
 
         for (let i = 0; i < orig.numberOfChannels; i++) {
             const chan = newBuffer.getChannelData(i);
@@ -1365,7 +1411,11 @@ jQuery(document).ready(function ($) {
             
             if (waveUndoStack.length === 0) {
                 $(this).addClass('hidden');
+                hasUnsavedChanges = false;
+            } else {
+                hasUnsavedChanges = true;
             }
+            requestAutoSave();
             $(this).text(`UNDO (${waveUndoStack.length})`);
         }
     });
@@ -1379,8 +1429,12 @@ jQuery(document).ready(function ($) {
             filename: activeFileName
         }, function(res) {
             if (res.success) {
+                // Delete autosave if it exists
+                deleteAutosave(activeFileName);
+
                 // Reload the waveform with the original URL (bypass cache by adding timestamp)
                 const freshUrl = activeFileUrl + '?t=' + new Date().getTime();
+                hasUnsavedChanges = false;
                 loadWaveform(freshUrl, activeFileName, false);
                 alert('Restaurado correctamente.');
             } else {
@@ -1414,7 +1468,12 @@ jQuery(document).ready(function ($) {
                 success: function(response) {
                     if (response.success) {
                         alert('¡Cambios guardados con éxito!');
+                        hasUnsavedChanges = false;
                         $btn.addClass('hidden');
+                        
+                        // Clean up autosave
+                        deleteAutosave(activeFileName);
+
                         if (response.data.has_backup) {
                             $('#wave-restore').removeClass('hidden');
                         }
@@ -1447,7 +1506,7 @@ jQuery(document).ready(function ($) {
         waveUndoStack.push(activeAudioBuffer);
 
         // Create new AudioBuffer from sliced data
-        const newBuffer = audioCtx.createBuffer(
+        const newBuffer = getAudioCtx().createBuffer(
             activeAudioBuffer.numberOfChannels,
             frameCount,
             activeAudioBuffer.sampleRate
@@ -1466,6 +1525,8 @@ jQuery(document).ready(function ($) {
 
         // Update Master Buffer
         activeAudioBuffer = newBuffer;
+        hasUnsavedChanges = true;
+        requestAutoSave();
 
         // Generate Preview for WaveSurfer
         const blob = audioBufferToWav(activeAudioBuffer);
@@ -1543,6 +1604,60 @@ jQuery(document).ready(function ($) {
         $('.view-pane').addClass('hidden');
         $(`#view-${view}`).removeClass('hidden');
     });
+
+    // --- Auto-save Helpers ---
+    function requestAutoSave() {
+        if (autoSaveTimer) clearTimeout(autoSaveTimer);
+        $('#wave-save-indicator').remove();
+        $('body').append('<div id="wave-save-indicator" style="position:fixed; bottom:20px; right:20px; background:rgba(0,0,0,0.7); color:white; padding:5px 10px; font-family:VT323; z-index:9999; border:2px solid #00ffff;">MODIFICADO (Sin guardar)</div>');
+
+        autoSaveTimer = setTimeout(() => {
+            performAutoSave();
+        }, 5000); // 5 seconds of inactivity
+    }
+
+    function performAutoSave() {
+        if (!activeAudioBuffer || !activeFileName) return;
+        isAutoSaving = true;
+        $('#wave-save-indicator').text('AUTOGUARDANDO...').css('border-color', '#ff00ff');
+
+        const blob = audioBufferToWav(activeAudioBuffer);
+        const formData = new FormData();
+        formData.append('action', 'voiceqwen_save_autosave');
+        formData.append('nonce', voiceqwen_ajax.nonce);
+        formData.append('filename', activeFileName);
+        formData.append('audio', blob, activeFileName + '-autosave.wav');
+
+        $.ajax({
+            url: voiceqwen_ajax.url,
+            type: 'POST',
+            data: formData,
+            processData: false,
+            contentType: false,
+            success: function(res) {
+                isAutoSaving = false;
+                if (res.success) {
+                    $('#wave-save-indicator').text('AUTO-SAVE OK').css('color', '#00ff00');
+                    setTimeout(() => $('#wave-save-indicator').fadeOut(), 2000);
+                } else {
+                    $('#wave-save-indicator').text('AUTO-SAVE ERROR').css('color', 'red');
+                }
+            },
+            error: function() {
+                isAutoSaving = false;
+                $('#wave-save-indicator').text('ERROR DE RED').css('color', 'red');
+            }
+        });
+    }
+
+    function deleteAutosave(filename) {
+        $.post(voiceqwen_ajax.url, {
+            action: 'voiceqwen_delete_autosave',
+            nonce: voiceqwen_ajax.nonce,
+            filename: filename
+        });
+        $('#wave-save-indicator').remove();
+    }
 
     // Consolidated Initial Load
     loadVoices();

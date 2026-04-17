@@ -48,6 +48,7 @@
 .voiceqwen-theme-90ties html {
     margin: 0 !important;
     padding: 0 !important;
+    overscroll-behavior-x: none; /* Block trackpad swipe-to-navigate */
 }
 
 .voiceqwen-theme-90ties .vapor-container {
