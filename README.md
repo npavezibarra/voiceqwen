@@ -1,4 +1,4 @@
-# ARCHETYPICAL CHILEAN
+# LOCUTOR
 
 El plugin de TTS (Text-To-Speech) definitivo para clonación de voces chilenas icónicas, potenciado por el modelo **Qwen3-TTS 1.7B**.
 

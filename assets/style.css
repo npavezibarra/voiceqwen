@@ -451,7 +451,7 @@
 }
 
 .voiceqwen-theme-90ties .hidden {
-    display: none !important;
+    display: none;
 }
 
 .voiceqwen-theme-90ties .status-pass {
@@ -1035,7 +1035,7 @@
 }
 
 .voiceqwen-theme-minimal .hidden {
-    display: none !important;
+    display: none;
 }
 
 .voiceqwen-theme-minimal .stability-control {
@@ -1228,3 +1228,172 @@
     min-height: 20px;
     height: auto;
 }
+
+/* --- 90ties Theme Specific Audiobook Styles --- */
+.voiceqwen-theme-90ties .audiobook-workspace {
+    display: flex;
+    height: calc(100vh - 250px);
+    width: 100%;
+    background: rgba(0, 0, 0, 0.6);
+    border: 3px solid #ff00ff; /* Neon Magenta */
+    box-shadow: 10px 10px 0 #000;
+    margin-top: 20px;
+    font-family: 'VT323', monospace;
+}
+
+.voiceqwen-theme-90ties .audiobook-col {
+    display: flex;
+    flex-direction: column;
+    border-right: 2px solid #00ffff; /* Neon Cyan */
+    overflow-y: auto;
+    background: rgba(0, 255, 255, 0.02);
+}
+
+.voiceqwen-theme-90ties .book-col { width: 280px; }
+.voiceqwen-theme-90ties .chapter-col { width: 320px; }
+.voiceqwen-theme-90ties .editor-col { 
+    flex: 1; 
+    border-right: none;
+    background: rgba(255, 0, 255, 0.03);
+}
+
+.voiceqwen-theme-90ties .col-header {
+    background: #000;
+    color: #00ffff;
+    padding: 12px 15px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    border-bottom: 2px solid #00ffff;
+    text-shadow: 0 0 5px #00ffff;
+}
+
+.voiceqwen-theme-90ties .col-header h3 {
+    margin: 0 !important;
+    font-size: 20px;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+}
+
+.voiceqwen-theme-90ties .mini-form {
+    padding: 15px;
+    background: rgba(255, 0, 255, 0.1);
+    border-bottom: 2px solid #ff00ff;
+}
+
+.voiceqwen-theme-90ties .mini-form input {
+    width: 100%;
+    margin-bottom: 10px;
+    font-size: 16px;
+    padding: 8px;
+    background: #000;
+    color: #ff00ff;
+    border: 1px solid #ff00ff;
+    font-family: 'VT323', monospace;
+    outline: none;
+}
+
+.voiceqwen-theme-90ties .vapor-list li.active {
+    background: #00ffff !important;
+    color: #000 !important;
+}
+
+/* --- MINIMAL Theme Specific Audiobook Styles --- */
+.voiceqwen-theme-minimal .audiobook-workspace {
+    display: flex;
+    height: calc(100vh - 250px);
+    width: 100%;
+    margin-top: 20px;
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    overflow: hidden;
+    font-family: 'Montserrat', sans-serif;
+}
+
+.voiceqwen-theme-minimal .audiobook-col {
+    display: flex;
+    flex-direction: column;
+    border-right: 1px solid #e2e8f0;
+    overflow-y: auto;
+    background: #fff;
+}
+
+.voiceqwen-theme-minimal .book-col { width: 250px; background: #f8fafc; }
+.voiceqwen-theme-minimal .chapter-col { width: 280px; }
+.voiceqwen-theme-minimal .editor-col { flex: 1; border-right: none; }
+
+.voiceqwen-theme-minimal .col-header {
+    background: #0f172a; /* Slate 900 */
+    color: #fff;
+    padding: 12px 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    position: sticky;
+    top: 0;
+    z-index: 5;
+}
+
+.voiceqwen-theme-minimal .col-header h3 {
+    margin: 0 !important;
+    font-size: 13px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.voiceqwen-theme-minimal .mini-form {
+    padding: 16px;
+    background: #f1f5f9;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.voiceqwen-theme-minimal .mini-form input {
+    width: 100%;
+    margin-bottom: 10px;
+    font-size: 14px;
+    padding: 8px 12px;
+    background: #fff;
+    color: #0f172a;
+    border: 1px solid #cbd5e1;
+    border-radius: 4px;
+    font-family: inherit;
+    outline: none;
+}
+
+.voiceqwen-theme-minimal .mini-form input:focus {
+    border-color: #0f172a;
+}
+
+.voiceqwen-theme-minimal .vapor-list li {
+    padding: 12px 16px;
+    border-bottom: 1px solid #f1f5f9;
+    cursor: pointer;
+    transition: background 0.2s;
+    font-size: 14px;
+}
+
+.voiceqwen-theme-minimal .vapor-list li:hover {
+    background: #f1f5f9;
+}
+
+.voiceqwen-theme-minimal .vapor-list li.active {
+    background: #0f172a !important;
+    color: #fff !important;
+}
+
+.voiceqwen-theme-minimal .empty-hint {
+    opacity: 0.5;
+    padding: 40px 16px;
+    font-size: 13px;
+    text-align: center;
+    font-style: italic;
+}
+
+.voiceqwen-theme-minimal .audiobook-col::-webkit-scrollbar { width: 5px; }
+.voiceqwen-theme-minimal .audiobook-col::-webkit-scrollbar-thumb { background: #cbd5e1; }

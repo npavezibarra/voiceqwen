@@ -19,8 +19,14 @@ jQuery(document).ready(function ($) {
         return audioCtx;
     }
 
-    let currentJobSource = ''; // 'create', 'dialogue', or 'mini'
+    let currentJobSource = ''; 
     let currentJobFileUrl = '';
+    
+    // Expose to global namespace for multi-module communication
+    window.VoiceQwen = window.VoiceQwen || {};
+    window.VoiceQwen.currentJobSource = '';
+    window.VoiceQwen.startPolling = startPolling;
+    window.VoiceQwen.checkBackgroundStatus = checkBackgroundStatus;
     let lastInsertTime = 0;
     
     // Mini-modal Draggable state
@@ -228,7 +234,7 @@ jQuery(document).ready(function ($) {
             $(`#view-${view}`).removeClass('hidden');
         }
 
-        if (view === 'create') {
+        if (view === 'create' || view === 'audiobook') {
             loadVoices();
         }
     });
@@ -292,7 +298,7 @@ jQuery(document).ready(function ($) {
                     }
                 });
 
-                // Also populate Mini Selector if it exists
+                // Mini Selector if it exists (e.g. in popups)
                 const $miniSelector = $('#mini-voice-selector');
                 if ($miniSelector.length) {
                     $miniSelector.empty();
@@ -309,6 +315,10 @@ jQuery(document).ready(function ($) {
                         $miniSelector.append(html);
                     });
                 }
+
+                // Trigger event for Audiobook module or other extensions
+                $(document).trigger('voiceqwen_voices_loaded', [response.data]);
+
             } else {
                 console.error("VoiceQwen: Failed to load voices:", response.data);
                 $selector.html('<p style="color:red;">Error al cargar voces: ' + (response.data || 'Error desconocido') + '</p>');
@@ -361,13 +371,17 @@ jQuery(document).ready(function ($) {
     $('#reset-status-btn').on('click', function () {
         if (!confirm('¿Estás seguro de que quieres cancelar el proceso actual?')) return;
 
+        $('#reset-status-btn').text('DETENIENDO...').prop('disabled', true);
         $.post(voiceqwen_ajax.url, {
             action: 'voiceqwen_reset_status',
             nonce: voiceqwen_ajax.nonce
         }, function (response) {
-            if (response.success) {
+            $('#reset-status-btn').text('DETENER PROCESO / RESET').prop('disabled', false);
+            if (response.success || response.data === 'No se detectó proceso activo, pero se forzó limpieza') {
                 $('#generate-btn').prop('disabled', false).text('Generar Audio').css('background', '');
+                $('#generate-audiobook-btn').prop('disabled', false).text('Generar Audio');
                 $('#status-msg').hide();
+                $('#audiobook-status-msg').hide();
                 $('#reset-status-btn').addClass('hidden');
                 if (pollingInterval) {
                     clearInterval(pollingInterval);
@@ -387,12 +401,16 @@ jQuery(document).ready(function ($) {
             action: 'voiceqwen_check_status',
             nonce: voiceqwen_ajax.nonce
         }, function (response) {
-            const $btn = $('#generate-btn');
+            let $btn = $('#generate-btn');
             const $reset = $('#reset-status-btn');
+            
+            // Sync local source with global if changed externally
+            currentJobSource = window.VoiceQwen.currentJobSource;
 
             let $targetStatus = $('#status-msg');
             if (currentJobSource === 'dialogue') $targetStatus = $('#dialogue-status-msg');
             if (currentJobSource === 'mini') $targetStatus = $('#mini-status');
+            if (currentJobSource === 'audiobook') $targetStatus = $('#audiobook-status-msg');
 
             if (response.success && response.data.status === 'processing') {
                 const details = response.data.details;
@@ -486,6 +504,7 @@ jQuery(document).ready(function ($) {
                 if (currentJobSource === 'create') $btn.prop('disabled', true).text('Procesando...');
                 if (currentJobSource === 'dialogue') $('#generate-dialogue-btn').prop('disabled', true).text('Procesando...');
                 if (currentJobSource === 'mini') $('#mini-generate-btn').prop('disabled', true).text('GENERATING...');
+                if (currentJobSource === 'audiobook') $('#generate-audiobook-btn').prop('disabled', true).text('Procesando...');
 
                 $reset.removeClass('hidden');
                 if (!pollingInterval) startPolling();
@@ -507,6 +526,9 @@ jQuery(document).ready(function ($) {
                     } else if (currentJobSource === 'dialogue') {
                         $('#generate-dialogue-btn').prop('disabled', false).text('Generar Diálogo');
                         $targetStatus.text('¡Diálogo listo!').css('color', 'green');
+                    } else if (currentJobSource === 'audiobook') {
+                        $('#generate-audiobook-btn').prop('disabled', false).text('Generar Audio');
+                        $targetStatus.text('¡Audio listo!').css('color', 'green');
                     } else {
                         $btn.prop('disabled', false).text('Generar Audio');
                         $targetStatus.text('¡Proceso finalizado!').css('color', 'green');
@@ -521,6 +543,13 @@ jQuery(document).ready(function ($) {
 
     let currentPath = ''; // Track current folder path
     let fullFileTree = []; // Store full tree for navigation
+
+    // Expose to global namespace for modularity
+    window.VoiceQwen = window.VoiceQwen || {};
+    window.VoiceQwen.setPath = function(path) { currentPath = path; };
+    window.VoiceQwen.getPath = function() { return currentPath; };
+    window.VoiceQwen.render = function() { renderCurrentPath(); };
+    window.VoiceQwen.loadFiles = function() { loadFileList(); };
 
     function loadFileList() {
         $.post(voiceqwen_ajax.url, {
@@ -639,37 +668,71 @@ jQuery(document).ready(function ($) {
             e.preventDefault();
             const rect = this.getBoundingClientRect();
             const relY = e.originalEvent.clientY - rect.top;
-            $(this).removeClass('drag-over-top drag-over-bottom');
+            const isFolder = $(this).hasClass('folder-item');
             
-            if (relY < rect.height / 2) {
-                $(this).addClass('drag-over-top');
+            $(this).removeClass('drag-over-top drag-over-bottom drop-hover');
+            
+            // For folders, use 25/50/25 split (Top edge = reorder above, Bottom edge = reorder below, Center = drop inside)
+            if (isFolder) {
+                const threshold = rect.height * 0.25;
+                if (relY < threshold) {
+                    $(this).addClass('drag-over-top');
+                } else if (relY > rect.height - threshold) {
+                    $(this).addClass('drag-over-bottom');
+                } else {
+                    $(this).addClass('drop-hover');
+                }
             } else {
-                $(this).addClass('drag-over-bottom');
+                // For files, simple 50/50 split for reordering
+                if (relY < rect.height / 2) {
+                    $(this).addClass('drag-over-top');
+                } else {
+                    $(this).addClass('drag-over-bottom');
+                }
             }
         });
 
         $el.on('dragleave', function() {
-            $(this).removeClass('drag-over-top drag-over-bottom');
+            $(this).removeClass('drag-over-top drag-over-bottom drop-hover');
         });
 
         $el.on('dragend', function() {
             $(this).removeClass('is-dragging');
-            $('.drag-over-top, .drag-over-bottom').removeClass('drag-over-top drag-over-bottom');
+            $('.drag-over-top, .drag-over-bottom, .drop-hover').removeClass('drag-over-top drag-over-bottom drop-hover');
         });
 
         $el.on('drop', function(e) {
             e.preventDefault();
             e.stopPropagation();
+            
             const draggedRel = e.originalEvent.dataTransfer.getData('text/plain');
             const draggedName = e.originalEvent.dataTransfer.getData('item-name');
             const targetName = $(this).data('filename');
+            const targetRel = $(this).data('rel');
             
-            $(this).removeClass('drag-over-top drag-over-bottom');
+            const isDropInside = $(this).hasClass('drop-hover');
+            const isTop = $(this).hasClass('drag-over-top');
             
-            if (draggedRel === $(this).data('rel')) return;
+            $(this).removeClass('drag-over-top drag-over-bottom drop-hover');
 
-            const isTop = (e.originalEvent.clientY - this.getBoundingClientRect().top) < (this.getBoundingClientRect().height / 2);
+            // 1. Handle OS File Uploads
+            if (e.originalEvent.dataTransfer.files && e.originalEvent.dataTransfer.files.length > 0) {
+                const targetFolder = isDropInside ? targetRel : currentPath;
+                handleOSFileUpload(e.originalEvent.dataTransfer.files[0], targetFolder);
+                return;
+            }
             
+            if (!draggedRel) return;
+
+            // 2. Handle Nesting (Move inside folder)
+            if (isDropInside) {
+                if (draggedRel === targetRel) return;
+                performMoveItem(draggedRel, targetRel);
+                return;
+            }
+
+            // 3. Handle Reordering
+            if (draggedRel === targetRel) return;
             reorderItems(draggedName, targetName, isTop);
         });
     }
@@ -711,6 +774,62 @@ jQuery(document).ready(function ($) {
         });
     }
 
+    function handleOSFileUpload(file, targetFolder) {
+        if (!file.name.toLowerCase().endsWith('.wav')) {
+            alert('Solo se permiten archivos .wav');
+            return;
+        }
+        
+        const formData = new FormData();
+        formData.append('action', 'voiceqwen_upload_os_file');
+        formData.append('nonce', voiceqwen_ajax.nonce);
+        formData.append('file', file);
+        formData.append('target_folder', targetFolder);
+        
+        // Show temporary status in the relevant zone if possible
+        $.ajax({
+            url: voiceqwen_ajax.url,
+            type: 'POST',
+            data: formData,
+            processData: false,
+            contentType: false,
+            success: function(res) {
+                if (res.success) {
+                    loadFileList();
+                } else {
+                    alert(res.data);
+                    loadFileList();
+                }
+            },
+            error: function() {
+                alert('Error al subir el archivo');
+                loadFileList();
+            }
+        });
+    }
+
+    function performMoveItem(itemRel, targetFolder) {
+        if (itemRel === targetFolder || !itemRel) return;
+        
+        if (targetFolder !== '' && targetFolder.startsWith(itemRel + '/')) {
+            alert("No puedes mover una carpeta dentro de sí misma.");
+            return;
+        }
+
+        $.post(voiceqwen_ajax.url, {
+            action: 'voiceqwen_move_item',
+            nonce: voiceqwen_ajax.nonce,
+            item_rel: itemRel,
+            target_folder: targetFolder
+        }, function(res) {
+            if (res.success) {
+                loadFileList();
+            } else {
+                alert(res.data);
+            }
+        });
+    }
+
     function setupDropZone($el) {
         $el.on('dragenter', function(e) {
             e.preventDefault();
@@ -731,63 +850,12 @@ jQuery(document).ready(function ($) {
             
             // Check for OS files
             if (e.originalEvent.dataTransfer.files && e.originalEvent.dataTransfer.files.length > 0) {
-                const file = e.originalEvent.dataTransfer.files[0];
-                if (!file.name.toLowerCase().endsWith('.wav')) {
-                    alert('Solo se permiten archivos .wav');
-                    return;
-                }
-                
-                const formData = new FormData();
-                formData.append('action', 'voiceqwen_upload_os_file');
-                formData.append('nonce', voiceqwen_ajax.nonce);
-                formData.append('file', file);
-                formData.append('target_folder', targetFolder);
-                
-                const originalText = $(this).text();
-                $(this).text('Subiendo...'); // Update UI
-                
-                $.ajax({
-                    url: voiceqwen_ajax.url,
-                    type: 'POST',
-                    data: formData,
-                    processData: false,
-                    contentType: false,
-                    success: function(res) {
-                        if (res.success) {
-                            loadFileList();
-                        } else {
-                            alert(res.data);
-                            loadFileList();
-                        }
-                    },
-                    error: function() {
-                        alert('Error al subir el archivo');
-                        loadFileList();
-                    }
-                });
+                handleOSFileUpload(e.originalEvent.dataTransfer.files[0], targetFolder);
                 return;
             }
 
             const itemRel = e.originalEvent.dataTransfer.getData('text/plain');
-            if (itemRel === targetFolder || !itemRel) return;
-            
-            if (targetFolder !== '' && targetFolder.startsWith(itemRel + '/')) {
-                alert("No puedes mover una carpeta dentro de sí misma.");
-                return;
-            }
-
-            $.post(voiceqwen_ajax.url, {
-                action: 'voiceqwen_move_item',
-                nonce: voiceqwen_ajax.nonce,
-                item_rel: itemRel,
-                target_folder: targetFolder
-            }, function(res) {
-                if (res.success) {
-                    loadFileList();
-                } else {
-                    alert(res.data);
-                }
-            });
+            performMoveItem(itemRel, targetFolder);
         });
     }
 
@@ -1598,6 +1666,8 @@ jQuery(document).ready(function ($) {
     $(document).on('input', '#dialogue-stability', function() {
         $('#dialogue-stability-val').text($(this).val());
     });
+
+
 
     $(document).on('click', '.nav-btn-back', function() {
         const view = $(this).data('view');

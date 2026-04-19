@@ -1,6 +1,6 @@
 <?php
 /**
- * Plugin Name: ARCHETYPICAL CHILEAN
+ * Plugin Name: LOCUTOR
  * Description: Creates a "Voice" page and adds it to the main menu.
  * Version: 1.0
  * Author: Antigravity
@@ -12,6 +12,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 // Include required classes
 require_once plugin_dir_path( __FILE__ ) . 'includes/class-voiceqwen-audio-analyzer.php';
+require_once plugin_dir_path( __FILE__ ) . 'modules/audiobook/audiobook.php';
 
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -44,6 +45,7 @@ function voiceqwen_enqueue_assets() {
     wp_enqueue_script( 'wavesurfer-timeline', 'https://unpkg.com/wavesurfer.js@7.12.6/dist/plugins/timeline.min.js', array( 'wavesurfer' ), '7.12.6', true );
 
     wp_enqueue_script( 'voiceqwen-script', plugins_url( 'assets/script.js', __FILE__ ), array( 'jquery', 'wavesurfer', 'wavesurfer-regions', 'wavesurfer-timeline' ), '1.0', true );
+    wp_enqueue_script( 'voiceqwen-audiobook', plugins_url( 'modules/audiobook/audiobook.js', __FILE__ ), array( 'voiceqwen-script' ), '1.0', true );
     
     wp_localize_script( 'voiceqwen-script', 'voiceqwen_ajax', array(
         'url' => admin_url( 'admin-ajax.php' ),
@@ -107,11 +109,12 @@ function voiceqwen_ui_shortcode() {
                 <div class="vapor-dots">
                     <span></span><span></span><span></span>
                 </div>
-                <div class="vapor-title">ARCHETYPICAL CHILEAN</div>
+                <div class="vapor-title">LOCUTOR</div>
                 <div class="vapor-nav">
                     <button class="nav-btn active" data-view="create">CREATE AUDIO</button>
                     <button class="nav-btn" data-view="dialogues">DIALOGUES</button>
                     <button class="nav-btn" data-view="waveform">WAVE VIEWER</button>
+                    <button class="nav-btn" data-view="audiobook">AUDIOBOOK</button>
                     <button class="nav-btn" data-view="upload-voice">UPLOAD VOICE</button>
                 </div>
             </div>
@@ -263,6 +266,8 @@ function voiceqwen_ui_shortcode() {
                     <div id="dialogue-status-msg"></div>
                 </div>
 
+                <?php voiceqwen_audiobook_render_ui(); ?>
+
                 <!-- View 3: Analysis -->
                 <div class="vapor-window main view-pane hidden" id="id-view-analysis">
                     <div class="vapor-window-header">
@@ -388,8 +393,14 @@ function voiceqwen_reset_status() {
     $status_file = $user_dir . '/status.json';
 
     if ( file_exists( $status_file ) ) {
-        // Also cleanup chunks if we are forcing a reset
         $data = json_decode( file_get_contents( $status_file ), true );
+
+        // 1. Kill the running Python process for this user
+        // We look for a process that has this status file in its arguments
+        $cmd_to_kill = sprintf( 'pkill -f "status_file %s"', escapeshellarg( $status_file ) );
+        exec( $cmd_to_kill );
+
+        // 2. Cleanup chunks and file
         if ( isset( $data['filename'] ) ) {
             $chunks_dir = $user_dir . '/' . $data['filename'] . '.chunks';
             if ( file_exists( $chunks_dir ) ) {
@@ -397,9 +408,12 @@ function voiceqwen_reset_status() {
             }
         }
         unlink( $status_file );
-        wp_send_json_success( 'Estado y fragmentos temporales reiniciados' );
+        wp_send_json_success( 'Proceso detenido y estado reiniciado' );
     } else {
-        wp_send_json_error( 'No hay proceso activo' );
+        // Even if no status file, let's try a generic cleanup for the user
+        $cmd_generic = sprintf( 'pkill -f "voiceqwen/%s"', escapeshellarg( $username ) );
+        exec( $cmd_generic );
+        wp_send_json_error( 'No se detectó proceso activo, pero se forzó limpieza' );
     }
 }
 add_action( 'wp_ajax_voiceqwen_reset_status', 'voiceqwen_reset_status' );
@@ -477,9 +491,18 @@ function voiceqwen_generate_audio() {
         wp_send_json_error( 'YA HAY UN PROCESO EN CURSO. Por favor espera a que termine o usa "CANCELAR / RESET" para limpiar el estado.' );
     }
 
-    // Deterministic filename based on text hash to allow resumption
-    $text_hash = md5( $text . $voice );
-    $filename = 'tts_' . $text_hash . '.wav';
+    // --- Naming Convention Logic ---
+    $audiobook_title = isset( $_POST['audiobook_title'] ) ? sanitize_file_name( $_POST['audiobook_title'] ) : '';
+    
+    if ( ! empty( $audiobook_title ) ) {
+        // Rule: {booktitle}-{chapter}.wav (pre-composed in JS)
+        $filename = $audiobook_title . '.wav';
+    } else {
+        // Default: m-[voice]-[datetime].wav
+        $date_suffix = date( 'Ymd_His' );
+        $filename = 'm-' . sanitize_file_name( $voice ) . '-' . $date_suffix . '.wav';
+    }
+
     $output_path = $user_dir . '/' . $filename;
     $log_path = $user_dir . '/last_job.log';
 
@@ -595,8 +618,23 @@ function voiceqwen_generate_dialogue() {
         wp_send_json_error( 'YA HAY UN PROCESO EN CURSO. Por favor espera a que termine o usa "CANCELAR / RESET" para limpiar el estado.' );
     }
 
-    $text_hash = md5( $text );
-    $filename = 'dialogue_' . $text_hash . '.wav';
+    // New Naming Convention for Dialogues: d-[initials]-[datetime].wav
+    // Extract speakers to get initials
+    preg_match_all( '/\[(.*?)\]/', $text, $matches );
+    $speakers = array_unique( $matches[1] );
+    $initials = '';
+    foreach ( $speakers as $speaker ) {
+        if ( empty( trim( $speaker ) ) || strpos( $speaker, '/' ) === 0 ) continue;
+        $clean_name = str_replace( ' ', '', $speaker );
+        $initials .= strtolower( substr( $clean_name, 0, 2 ) );
+    }
+    
+    // Fallback if no tags found
+    if ( empty( $initials ) ) $initials = 'dlg';
+
+    $date_suffix = date( 'Ymd_His' );
+    $filename = 'd-' . sanitize_file_name( $initials ) . '-' . $date_suffix . '.wav';
+    
     $output_path = $user_dir . '/' . $filename;
     $log_path = $user_dir . '/last_job.log';
 
@@ -1028,7 +1066,7 @@ function voiceqwen_add_to_menu( $page_id ) {
 
     if ( $menu_id ) {
         wp_update_nav_menu_item( $menu_id, 0, array(
-            'menu-item-title'     => 'ARCHETYPICAL CHILEAN',
+            'menu-item-title'     => 'LOCUTOR',
             'menu-item-object-id' => $page_id,
             'menu-item-object'    => 'page',
             'menu-item-type'      => 'post_type',
