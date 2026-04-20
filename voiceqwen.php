@@ -710,17 +710,13 @@ function voiceqwen_check_status() {
     if ( file_exists( $status_file ) ) {
         $status_data = json_decode( file_get_contents( $status_file ), true );
         
-        $is_completed = ( isset( $status_data['status'] ) && $status_data['status'] === 'completed' );
+        // Return the actual status from the JSON (processing, completed, error, etc.)
+        $status = isset( $status_data['status'] ) ? $status_data['status'] : 'processing';
         
         wp_send_json_success( array( 
-            'status'  => $is_completed ? 'completed' : 'processing', 
+            'status'  => $status, 
             'details' => $status_data 
         ) );
-
-        // If completed, we could unlink but maybe wait for one last poll from frontend
-        if ( $is_completed ) {
-            // unlink( $status_file ); 
-        }
     } else {
         wp_send_json_success( array( 'status' => 'idle' ) );
     }

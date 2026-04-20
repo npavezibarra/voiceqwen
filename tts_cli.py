@@ -14,7 +14,8 @@ from qwen_tts import Qwen3TTSModel
 
 # --- CONFIGURACIÓN ---
 MODEL_NAME = "Qwen/Qwen3-TTS-12Hz-1.7B-Base"
-DEVICE = "mps" if torch.backends.mps.is_available() else "cpu"
+# Force CPU for absolute stability on Mac environments where MPS hangs
+DEVICE = "cpu"
 SR = 24000
 
 # Paths to assets

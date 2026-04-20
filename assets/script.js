@@ -25,6 +25,12 @@ jQuery(document).ready(function ($) {
     // Expose to global namespace for multi-module communication
     window.VoiceQwen = window.VoiceQwen || {};
     window.VoiceQwen.currentJobSource = '';
+    
+    // Auto-discovery on load
+    setTimeout(function() {
+        console.log("VoiceQwen: Checking for background jobs on startup...");
+        checkBackgroundStatus();
+    }, 1500); 
     window.VoiceQwen.startPolling = startPolling;
     window.VoiceQwen.checkBackgroundStatus = checkBackgroundStatus;
     let lastInsertTime = 0;
@@ -88,6 +94,7 @@ jQuery(document).ready(function ($) {
         $btn.prop('disabled', true).text('Procesando...');
         $status.text('Iniciando proceso en segundo plano...').css('color', '#000');
         currentJobSource = 'create';
+        window.VoiceQwen.currentJobSource = 'create';
 
         $.ajax({
             url: voiceqwen_ajax.url,
@@ -133,6 +140,7 @@ jQuery(document).ready(function ($) {
         $btn.prop('disabled', true).text('Procesando...');
         $status.text('Iniciando diálogo en segundo plano...').css('color', '#000');
         currentJobSource = 'dialogue';
+        window.VoiceQwen.currentJobSource = 'dialogue';
 
         $.ajax({
             url: voiceqwen_ajax.url,
@@ -402,18 +410,36 @@ jQuery(document).ready(function ($) {
             nonce: voiceqwen_ajax.nonce
         }, function (response) {
             let $btn = $('#generate-btn');
-            const $reset = $('#reset-status-btn');
+            let $reset = $('#reset-status-btn');
             
-            // Sync local source with global if changed externally
-            currentJobSource = window.VoiceQwen.currentJobSource;
-
-            let $targetStatus = $('#status-msg');
-            if (currentJobSource === 'dialogue') $targetStatus = $('#dialogue-status-msg');
-            if (currentJobSource === 'mini') $targetStatus = $('#mini-status');
-            if (currentJobSource === 'audiobook') $targetStatus = $('#audiobook-status-msg');
+            // Sync currentJobSource from window global if available
+            if (window.VoiceQwen && window.VoiceQwen.currentJobSource) {
+                currentJobSource = window.VoiceQwen.currentJobSource;
+            }
 
             if (response.success && response.data.status === 'processing') {
                 const details = response.data.details;
+                const filename = details.filename || '';
+
+                // AUTO-DISCOVERY: If we don't know where this job came from, look at the filename
+                if (!currentJobSource) {
+                    if (filename.startsWith('d-')) {
+                        currentJobSource = 'dialogue';
+                    } else if (filename.startsWith('m-')) {
+                        currentJobSource = 'create';
+                    } else if (filename.includes('-')) {
+                        // Audiobook files use {book}-{chapter} format
+                        currentJobSource = 'audiobook'; 
+                    }
+                    window.VoiceQwen.currentJobSource = currentJobSource;
+                    console.log("VoiceQwen Auto-Discovery: Job identified as " + currentJobSource);
+                }
+
+                let $targetStatus = $('#status-msg');
+                if (currentJobSource === 'dialogue') $targetStatus = $('#dialogue-status-msg');
+                if (currentJobSource === 'mini') $targetStatus = $('#mini-status');
+                if (currentJobSource === 'audiobook') $targetStatus = $('#audiobook-status-msg');
+
                 const startTime = details.time;
                 const elapsed = Math.floor((Date.now() / 1000) - startTime);
                 const minutes = Math.floor(elapsed / 60);
@@ -482,23 +508,32 @@ jQuery(document).ready(function ($) {
                 const displayMsg = details.message || (details.current ? `Procesando fragmento ${details.current}` : "Iniciando sistema...");
 
                 const richHtml = `
-                    <div style="background:#0000ff; color:#fff; padding:5px 10px; margin-bottom:10px; font-weight:bold; display:flex; justify-content:space-between; font-size: 14px;">
-                        <span>${statusEmoji} ESTADO DEL PROCESO</span>
-                        <span>FRAGMENTO ${currentFrag} de ${totalFrags}</span>
-                    </div>
-                    <div style="border:2px solid #0000ff; padding:15px; background:rgba(0,0,255,0.02); font-size: 14px;">
-                        <div style="color:${statusColor}; font-weight:bold; font-size:1.1em; margin-bottom: 10px;">
-                            ${statusEmoji} ${displayMsg.toUpperCase()}
-                        </div>
-                        ${progressStr}
-                        ${etaStr}
-                        <div style="font-size:0.95em; color:#333; margin-top:15px; padding-top:10px; border-top:2px dotted #0000ff;">
-                            <b>Tiempo transcurrido:</b> ${timeStr}
+                    <div class="status-overlay-bg">
+                        <div class="status-overlay-content">
+                            <div style="background:#0000ff; color:#fff; padding:5px 10px; margin-bottom:10px; font-weight:bold; display:flex; justify-content:space-between; font-size: 14px;">
+                                <span>${statusEmoji} ESTADO DEL PROCESO</span>
+                                <span>FRAGMENTO ${currentFrag} de ${totalFrags}</span>
+                            </div>
+                            <div style="border:2px solid #0000ff; padding:15px; background:rgba(0,0,255,0.02); font-size: 14px;">
+                                <div style="color:${statusColor}; font-weight:bold; font-size:1.1em; margin-bottom: 10px;">
+                                    ${statusEmoji} ${displayMsg.toUpperCase()}
+                                </div>
+                                ${progressStr}
+                                ${etaStr}
+                                <div style="font-size:0.95em; color:#333; margin-top:15px; padding-top:10px; border-top:2px dotted #0000ff;">
+                                    <b>Tiempo transcurrido:</b> ${timeStr}
+                                </div>
+                            </div>
+                            <!-- Move reset button here for visibility -->
+                            <div id="overlay-controls" style="margin-top:20px;"></div>
                         </div>
                     </div>
                 `;
 
                 $targetStatus.show().html(richHtml);
+                
+                // Reparent or show the reset button inside the overlay
+                $reset.detach().appendTo('#overlay-controls').removeClass('hidden');
 
                 // Disable appropriate button
                 if (currentJobSource === 'create') $btn.prop('disabled', true).text('Procesando...');
@@ -509,37 +544,74 @@ jQuery(document).ready(function ($) {
                 $reset.removeClass('hidden');
                 if (!pollingInterval) startPolling();
             } else {
+                // STOP Polling
                 if (pollingInterval) {
                     clearInterval(pollingInterval);
                     pollingInterval = null;
                 }
                 
-                if ($btn.text() === 'Procesando...' || $('#generate-dialogue-btn').text() === 'Procesando...' || $('#mini-generate-btn').text() === 'GENERATING...') {
-                    
+                const isError = (response.data.status === 'error');
+                const finalMessage = isError 
+                    ? `<div style="color:red; font-weight:bold;">⚠️ ERROR: ${response.data.details.message || 'Desconocido'}</div>`
+                    : '¡Proceso finalizado!';
+                const finalColor = isError ? 'red' : 'green';
+
+                // Check if we were processing, OR if we just discovered a completed job
+                const buttons = [$btn, $('#generate-dialogue-btn'), $('#mini-generate-btn'), $('#generate-audiobook-btn')];
+                const wasProcessing = buttons.some(b => b.text().includes('Procesando') || b.text() === 'GENERATING...');
+
+                // Identify target status element again based on discovered source if needed
+                if (!currentJobSource && response.data.details && response.data.details.filename) {
+                    const fname = response.data.details.filename;
+                    if (fname.startsWith('d-')) currentJobSource = 'dialogue';
+                    else if (fname.startsWith('m-')) currentJobSource = 'create';
+                    else currentJobSource = 'audiobook';
+                }
+
+                let $finalStatus = $('#status-msg');
+                if (currentJobSource === 'dialogue') $finalStatus = $('#dialogue-status-msg');
+                if (currentJobSource === 'audiobook') $finalStatus = $('#audiobook-status-msg');
+                if (currentJobSource === 'mini') $finalStatus = $('#mini-status');
+
+                if (wasProcessing || response.data.status === 'completed') {
+                    const overlayHtml = `
+                        <div class="status-overlay-bg">
+                            <div class="status-overlay-content">
+                                <div style="text-align:center; padding: 20px;">
+                                    <div style="font-size: 40px; margin-bottom: 15px;">${isError ? '❌' : '✅'}</div>
+                                    <div style="font-size: 1.2em; margin-bottom: 20px;">${finalMessage}</div>
+                                    <button class="vapor-btn-main status-overlay-close-btn" style="width: 100%;">CERRAR VENTANA</button>
+                                </div>
+                            </div>
+                        </div>`;
+
+                    $finalStatus.show().html(overlayHtml);
+
                     if (currentJobSource === 'mini' && response.data.status === 'completed') {
-                        $targetStatus.text('¡Audio generado! Insertando...').css('color', 'green');
                         handleInsertion(currentJobFileUrl);
                         $('#mini-generate-btn').prop('disabled', false).text('GENERATE & INSERT');
-                        // No hide reset here because we want to finish insertion
                     } else if (currentJobSource === 'mini') {
                         $('#mini-generate-btn').prop('disabled', false).text('GENERATE & INSERT');
                     } else if (currentJobSource === 'dialogue') {
                         $('#generate-dialogue-btn').prop('disabled', false).text('Generar Diálogo');
-                        $targetStatus.text('¡Diálogo listo!').css('color', 'green');
                     } else if (currentJobSource === 'audiobook') {
                         $('#generate-audiobook-btn').prop('disabled', false).text('Generar Audio');
-                        $targetStatus.text('¡Audio listo!').css('color', 'green');
                     } else {
                         $btn.prop('disabled', false).text('Generar Audio');
-                        $targetStatus.text('¡Proceso finalizado!').css('color', 'green');
                     }
 
-                    $reset.addClass('hidden');
+                    // Detach reset and hide it (back to its original place doesn't matter much as it's hidden)
+                    $reset.addClass('hidden').appendTo('.controls:first');
                     loadFileList();
                 }
             }
         });
     }
+
+    // Handle Closing Status Overlay
+    $(document).on('click', '.status-overlay-close-btn', function() {
+        $('#status-msg, #dialogue-status-msg, #audiobook-status-msg, #mini-status').hide().empty();
+    });
 
     let currentPath = ''; // Track current folder path
     let fullFileTree = []; // Store full tree for navigation
