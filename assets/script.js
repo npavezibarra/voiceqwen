@@ -21,6 +21,7 @@ jQuery(document).ready(function ($) {
 
     let currentJobSource = ''; 
     let currentJobFileUrl = '';
+    let sessionInsertedClips = []; // Tracking clips added during this edit session for cleanup
     
     // Expose to global namespace for multi-module communication
     window.VoiceQwen = window.VoiceQwen || {};
@@ -1364,6 +1365,9 @@ jQuery(document).ready(function ($) {
         });
 
         wavesurfer.load(url);
+        
+        // Reset session clips when loading a new file
+        sessionInsertedClips = [];
     }
 
     // --- Add Speech Logic (Refactored out of loadWaveform) ---
@@ -1483,6 +1487,15 @@ jQuery(document).ready(function ($) {
             if (!response.ok) throw new Error("File not ready");
             const arrayBuffer = await response.arrayBuffer();
             const insertBuffer = await getAudioCtx().decodeAudioData(arrayBuffer);
+            
+            // Extract filename from URL for cleanup later
+            try {
+                const fname = url.split('/').pop().split('?')[0];
+                if (fname && !sessionInsertedClips.includes(fname)) {
+                    sessionInsertedClips.push(fname);
+                    console.log("Waveform: Tracked clip for cleanup:", fname);
+                }
+            } catch(e) { console.warn("Failed to parse clip filename for cleanup", e); }
 
             const newBuffer = await insertAudioAt(activeAudioBuffer, insertBuffer, lastInsertTime);
             
@@ -1598,6 +1611,7 @@ jQuery(document).ready(function ($) {
             formData.append('nonce', voiceqwen_ajax.nonce);
             formData.append('filename', activeFileName);
             formData.append('audio', wavBlob, activeFileName);
+            formData.append('cleanup_files', JSON.stringify(sessionInsertedClips));
 
             $.ajax({
                 url: voiceqwen_ajax.url,
@@ -1610,6 +1624,9 @@ jQuery(document).ready(function ($) {
                         alert('¡Cambios guardados con éxito!');
                         hasUnsavedChanges = false;
                         $btn.addClass('hidden');
+                        
+                        // Clean up session clips
+                        sessionInsertedClips = [];
                         
                         // Clean up autosave
                         deleteAutosave(activeFileName);

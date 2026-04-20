@@ -1317,6 +1317,20 @@ function voiceqwen_save_edited_audio() {
     }
 
     if ( move_uploaded_file( $_FILES['audio']['tmp_name'], $file_path ) ) {
+        // Cleanup session clips if provided
+        $cleanup_files = isset($_POST['cleanup_files']) ? json_decode(stripslashes($_POST['cleanup_files']), true) : array();
+        if (is_array($cleanup_files)) {
+            foreach ($cleanup_files as $cf) {
+                $cf = sanitize_file_name($cf);
+                if (empty($cf)) continue;
+                $cf_path = $user_dir . '/' . $cf;
+                // Only delete if it exists and is NOT the main file we just saved
+                if ($cf !== $filename && file_exists($cf_path) && is_file($cf_path)) {
+                    unlink($cf_path);
+                }
+            }
+        }
+
         wp_send_json_success( array(
             'message' => 'Ediciones guardadas correctamente',
             'has_backup' => true
