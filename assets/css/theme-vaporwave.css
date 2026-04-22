@@ -1,0 +1,64 @@
+/* 90s Vaporwave Theme - Full Aesthetics */
+.voiceqwen-theme-90ties .vapor-grid-bg {
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -1;
+    background-color: #ffeef2;
+    background-image:
+        linear-gradient(rgba(0, 0, 255, 0.1) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0, 0, 255, 0.1) 1px, transparent 1px);
+    background-size: 40px 40px;
+}
+
+.voiceqwen-theme-90ties .vapor-container {
+    max-width: 1000px; margin: 0 auto; padding: 20px; font-family: 'VT323', monospace; position: relative; z-index: 1;
+}
+
+.voiceqwen-theme-90ties .vapor-header {
+    background: #0000ff; color: #fff; padding: 10px 20px; display: flex; align-items: center; border: 3px solid #000; margin-bottom: 30px; box-shadow: 10px 10px 0px rgba(0, 0, 255, 0.2);
+}
+
+.voiceqwen-theme-90ties .vapor-dots { display: flex; gap: 5px; margin-right: 15px; }
+.voiceqwen-theme-90ties .vapor-dots span { width: 8px; height: 8px; background: #fff; border-radius: 50%; border: 1px solid #000; }
+
+.voiceqwen-theme-90ties .vapor-title { font-size: 24px; text-transform: lowercase; }
+
+.voiceqwen-theme-90ties .nav-btn {
+    background: #fff; border: 2px solid #000; color: #000; font-family: 'VT323', monospace; font-size: 18px; padding: 2px 15px; cursor: pointer; box-shadow: 4px 4px 0px rgba(0, 0, 0, 0.2); transition: all 0.1s;
+}
+
+.voiceqwen-theme-90ties .nav-btn.active { background: #ff00ff; color: #fff; box-shadow: none; transform: translate(2px, 2px); }
+.voiceqwen-theme-90ties .nav-btn:hover:not(.active) { background: #ffeef2; }
+
+.voiceqwen-theme-90ties .vapor-window {
+    background: #fff; border: 3px solid #0000ff; position: relative; box-shadow: 8px 8px 0px rgba(0, 0, 0, 0.1);
+}
+
+.voiceqwen-theme-90ties .vapor-window-header {
+    background: #fff; border-bottom: 3px solid #0000ff; padding: 8px 15px; display: flex; align-items: center;
+}
+
+.voiceqwen-theme-90ties .vapor-window-header .vapor-dots span { background: #0000ff; border-color: #0000ff; }
+.voiceqwen-theme-90ties .vapor-window-title { color: #0000ff; font-size: 20px; }
+
+/* List and Items */
+.voiceqwen-theme-90ties .vapor-list { list-style: none; margin: 0; padding: 10px; }
+.voiceqwen-theme-90ties .vapor-list li {
+    padding: 8px; border-bottom: 2px dotted #0000ff; display: flex; justify-content: space-between; align-items: center; font-size: 18px; cursor: pointer; color: #000;
+}
+.voiceqwen-theme-90ties .vapor-list li:hover { background: #ffeef2; }
+
+/* Avatar UI */
+.voiceqwen-theme-90ties .voice-selector { padding: 15px; display: flex; gap: 30px; justify-content: center; border-bottom: 2px solid #0000ff; background: rgba(0, 0, 255, 0.05); }
+.voiceqwen-theme-90ties .avatar-circle {
+    width: 70px; height: 70px; border-radius: 50%; border: 3px solid #0000ff; background-size: cover; background-position: center; transition: all 0.2s; box-shadow: 4px 4px 0px rgba(0, 0, 0, 0.1);
+}
+.voiceqwen-theme-90ties .avatar-radio input:checked + .avatar-circle { border-color: #ff00ff; box-shadow: 0 0 15px #ff00ff; transform: scale(1.1); }
+.voiceqwen-theme-90ties .avatar-name { font-family: 'VT323', monospace; font-size: 18px; color: #0000ff; }
+
+.voiceqwen-theme-90ties .vapor-btn-main {
+    width: 100%; background: #0000ff; color: #fff; border: 3px solid #000; padding: 10px; font-family: 'VT323', monospace; font-size: 16px; cursor: pointer;
+}
+
+.voiceqwen-theme-90ties .vapor-deco-text {
+    position: absolute; top: -20px; right: 20px; font-size: 80px; color: #0000ff; opacity: 0.1; font-weight: bold; z-index: -1;
+}
+

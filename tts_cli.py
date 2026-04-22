@@ -42,24 +42,41 @@ def get_available_voices():
 VOICES = get_available_voices()
 
 def get_safe_chunks(text, max_words=15):
+    # First, split by punctuation to keep sentences together where possible
     sentences = re.split(r'(?<=[.!?]) +', text.replace('\n', ' '))
-    chunks = []
+    final_chunks = []
+    
+    for s in sentences:
+        words = s.split()
+        if not words: continue
+        
+        # If a single "sentence" is still too long, split it by word count
+        if len(words) > max_words:
+            for i in range(0, len(words), max_words):
+                chunk_words = words[i:i + max_words]
+                final_chunks.append(" ".join(chunk_words))
+        else:
+            final_chunks.append(s)
+            
+    # Now group the small chunks into larger chunks that don't exceed max_words
+    grouped_chunks = []
     current_chunk = []
     current_count = 0
     
-    for s in sentences:
-        word_count = len(s.split())
+    for c in final_chunks:
+        word_count = len(c.split())
         if current_count + word_count <= max_words or not current_chunk:
-            current_chunk.append(s)
+            current_chunk.append(c)
             current_count += word_count
         else:
-            chunks.append(" ".join(current_chunk))
-            current_chunk = [s]
+            grouped_chunks.append(" ".join(current_chunk))
+            current_chunk = [c]
             current_count = word_count
             
     if current_chunk:
-        chunks.append(" ".join(current_chunk))
-    return chunks
+        grouped_chunks.append(" ".join(current_chunk))
+        
+    return grouped_chunks
 
 def update_status(file_path, **kwargs):
     if not file_path:

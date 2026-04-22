@@ -61,8 +61,6 @@
                     <button id="save-chapter-btn" class="nav-btn" style="margin-top: 10px; width: 100%;">GUARDAR CAMBIOS</button>
                 </div>
                 <div id="audiobook-status-msg"></div>
-                <!-- Global reset button reference (ID should match the one in script.js logic) -->
-                <button id="reset-status-btn" class="nav-btn hidden" style="background:#ff4444; color:#fff; width:100%; margin-top:10px; font-weight:bold;">DETENER PROCESO / RESET</button>
             </div>
 
             <div id="editor-empty-hint" class="empty-hint" style="padding: 40px; text-align: center;">
