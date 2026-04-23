@@ -16,6 +16,7 @@ require_once plugin_dir_path( __FILE__ ) . 'includes/ajax-generation.php';
 require_once plugin_dir_path( __FILE__ ) . 'includes/ajax-files.php';
 require_once plugin_dir_path( __FILE__ ) . 'includes/ajax-editor.php';
 require_once plugin_dir_path( __FILE__ ) . 'includes/ajax-meta.php';
+require_once plugin_dir_path( __FILE__ ) . 'includes/ajax-markers.php';
 require_once plugin_dir_path( __FILE__ ) . 'includes/class-voiceqwen-audio-analyzer.php';
 require_once plugin_dir_path( __FILE__ ) . 'modules/audiobook/audiobook.php';
 
@@ -55,6 +56,7 @@ function voiceqwen_enqueue_assets() {
     wp_enqueue_script( 'voiceqwen-waveform-logic', plugins_url( 'assets/js/waveform-logic.js', __FILE__ ), array( 'jquery' ), '1.1', true );
     wp_enqueue_script( 'voiceqwen-waveform-ui', plugins_url( 'assets/js/waveform-ui.js', __FILE__ ), array( 'voiceqwen-core', 'wavesurfer', 'voiceqwen-waveform-logic' ), '1.1', true );
     wp_enqueue_script( 'voiceqwen-waveform-ruler-controls', plugins_url( 'assets/js/waveform-ruler-controls.js', __FILE__ ), array( 'voiceqwen-waveform-ui' ), '1.1', true );
+    wp_enqueue_script( 'voiceqwen-waveform-markers', plugins_url( 'assets/js/waveform-markers.js', __FILE__ ), array( 'voiceqwen-waveform-ui' ), '1.1', true );
     wp_enqueue_script( 'voiceqwen-file-manager', plugins_url( 'assets/js/file-manager.js', __FILE__ ), array( 'voiceqwen-core', 'voiceqwen-waveform-ui' ), '1.1', true );
 
     wp_enqueue_script( 'voiceqwen-audiobook', plugins_url( 'modules/audiobook/audiobook.js', __FILE__ ), array( 'voiceqwen-core' ), '1.0', true );

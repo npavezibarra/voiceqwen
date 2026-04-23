@@ -5,11 +5,12 @@ jQuery(document).ready(function ($) {
     let isDraggingMini = false, dragStartX, dragStartY, modalStartX, modalStartY;
     let autoSaveTimer = null, lastInsertTime = 0;
     let sessionTempClips = [];
-    let lastPointer = { pageX: 0, pageY: 0, clientX: 0, clientY: 0 };
+    let lastPointer = { clientX: 0, clientY: 0 };
     let activeRegion = null;
 
     window.VoiceQwen.loadWaveform = loadWaveform;
     window.VoiceQwen.handleInsertion = handleInsertion;
+    window.VoiceQwen.openAddSpeechAt = openAddSpeechAt;
 
     function getAudioCtx() { return window.VoiceQwen.getAudioCtx(); }
 
@@ -33,6 +34,7 @@ jQuery(document).ready(function ($) {
         activeFileName = filename;
         activeFileRelPath = relPath || filename;
         activeFileUrl = url;
+        window.VoiceQwen.activeFileRelPath = activeFileRelPath;
         sessionTempClips = [];
         $('#wave-viewer-empty, #wave-viewer-container').addClass('hidden');
         $('#wave-viewer-loading').removeClass('hidden');
@@ -86,7 +88,7 @@ jQuery(document).ready(function ($) {
         // Enforce single region logic
         wsRegions.on('region-created', (region) => {
             activeRegion = region;
-            showSegmentMenuAt(lastPointer.pageX || 0, lastPointer.pageY || 0);
+            showSegmentMenuAt(lastPointer.clientX || 0, lastPointer.clientY || 0);
             wsRegions.getRegions().forEach(r => {
                 if (r !== region) r.remove();
             });
@@ -94,7 +96,7 @@ jQuery(document).ready(function ($) {
 
         wsRegions.on('region-updated', (region) => {
             activeRegion = region;
-            showSegmentMenuAt(lastPointer.pageX || 0, lastPointer.pageY || 0);
+            showSegmentMenuAt(lastPointer.clientX || 0, lastPointer.clientY || 0);
             $('#wave-region-delete').removeClass('hidden').off('click').on('click', () => {
                 const newBuf = window.VoiceQwen.deleteSegment(window.VoiceQwen.activeAudioBuffer, region.start, region.end);
                 if (newBuf) {
@@ -156,23 +158,31 @@ jQuery(document).ready(function ($) {
         if (el) el.classList.add('hidden');
     }
 
-    function showSegmentMenuAt(pageX, pageY) {
+    function showSegmentMenuAt(clientX, clientY) {
         ensureSegmentMenu();
         const el = document.getElementById('wave-segment-menu');
         if (!el) return;
-        el.style.left = `${pageX}px`;
-        el.style.top = `${pageY}px`;
+        el.style.left = `${clientX}px`;
+        el.style.top = `${clientY}px`;
         el.classList.remove('hidden');
     }
 
-    function openAddSpeechAt(timeSeconds, pageX, pageY) {
+    function openAddSpeechAt(timeSeconds, clientX, clientY) {
         if (!wavesurfer) return;
         const duration = wavesurfer.getDuration() || 0;
         if (!duration) return;
         lastInsertTime = Math.max(0, Math.min(duration, Number(timeSeconds) || 0));
 
         const $modal = $('#wave-mini-modal');
-        $modal.removeClass('hidden').css({ left: `${pageX}px`, top: `${pageY}px` });
+        $modal.removeClass('hidden').css({ left: `${clientX}px`, top: `${clientY}px` });
+
+        // Reset defaults each time the panel opens (so it doesn't keep stale values).
+        $('#mini-stability').val('0.5');
+        $('#mini-stability-val').text('0.5');
+        $('#mini-max-words').val('40');
+        $('#mini-max-words-val').text('40');
+        $('#mini-pause-time').val('0.1');
+        $('#mini-pause-time-val').text('0.1');
 
         const $miniSelector = $('#mini-voice-selector');
         if ($miniSelector.children().length === 0) {
@@ -205,34 +215,16 @@ jQuery(document).ready(function ($) {
         // Accurate time calculation regardless of zoom.
         const t = (x / rect.width) * duration;
         console.log("Waveform: Context menu at time", t);
-        openAddSpeechAt(t, nativeEvent.pageX, nativeEvent.pageY);
+        openAddSpeechAt(t, nativeEvent.clientX, nativeEvent.clientY);
     }
 
-    // Primary handler (bubble) for normal cases.
-    $(document).on('contextmenu', '#waveform', function(e) {
-        e.preventDefault();
-        openAddSpeechModal(e.originalEvent || e);
-    });
-
-    // Fallback handler (capture) in case a library stops propagation on internal nodes.
-    // This fixes cases where right-click happens on internal WaveSurfer layers and our jQuery handler never sees it.
-    document.addEventListener('contextmenu', function(ev) {
-        try {
-            const wf = document.getElementById('waveform');
-            if (!wf) return;
-            if (!wavesurfer) return;
-            if (!wf.contains(ev.target)) return;
-            ev.preventDefault();
-            ev.stopPropagation();
-            openAddSpeechModal(ev);
-        } catch (_) {}
-    }, true);
+    // Right-click is handled by waveform-markers.js (point menu: VOICE / MARKER).
 
     // Track last pointer position inside the waveform, so region selection can spawn a small submenu under the cursor.
-    $(document).on('mousedown touchstart mouseup touchend', '#waveform', function(e) {
+    $(document).on('mousemove touchmove', '#waveform', function(e) {
         const oe = e.originalEvent && e.originalEvent.touches ? e.originalEvent.touches[0] : (e.originalEvent || e);
         if (!oe) return;
-        lastPointer = { pageX: oe.pageX || 0, pageY: oe.pageY || 0, clientX: oe.clientX || 0, clientY: oe.clientY || 0 };
+        lastPointer = { clientX: oe.clientX || 0, clientY: oe.clientY || 0 };
     });
 
     // Segment submenu actions (DELETE / VOICE)
@@ -251,7 +243,7 @@ jQuery(document).ready(function ($) {
             }
         } else if (action === 'voice') {
             hideSegmentMenu();
-            openAddSpeechAt(activeRegion.start, lastPointer.pageX || 0, lastPointer.pageY || 0);
+            openAddSpeechAt(activeRegion.start, lastPointer.clientX || 0, lastPointer.clientY || 0);
         }
     });
 
@@ -415,9 +407,9 @@ jQuery(document).ready(function ($) {
         if ($(e.target).closest('button').length) return;
         isDraggingMini = true;
         const $modal = $('#wave-mini-modal');
-        const offset = $modal.offset();
-        miniGrabX = e.pageX - offset.left;
-        miniGrabY = e.pageY - offset.top;
+        const rect = $modal[0].getBoundingClientRect();
+        miniGrabX = e.clientX - rect.left;
+        miniGrabY = e.clientY - rect.top;
         $modal.css('cursor', 'grabbing');
         e.preventDefault();
     });
@@ -425,9 +417,9 @@ jQuery(document).ready(function ($) {
     $(document).on('mousemove', function(e) {
         if (isDraggingMini) {
             const $modal = $('#wave-mini-modal');
-            $('#wave-mini-modal').css({
-                left: (e.pageX - miniGrabX) + 'px',
-                top: (e.pageY - miniGrabY) + 'px'
+            $modal.css({
+                left: (e.clientX - miniGrabX) + 'px',
+                top: (e.clientY - miniGrabY) + 'px'
             });
         }
     });

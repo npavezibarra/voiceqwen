@@ -21,16 +21,16 @@
         
         <div class="stability-control-mini" style="display: flex; flex-direction: column; gap: 8px;">
             <div>
-                <label class="mini-label">ESTABILIDAD: <span id="mini-stability-val">0.7</span></label>
-                <input type="range" id="mini-stability" min="0.1" max="1.0" step="0.1" value="0.7">
+                <label class="mini-label">ESTABILIDAD: <span id="mini-stability-val">0.5</span></label>
+                <input type="range" id="mini-stability" min="0.1" max="1.0" step="0.1" value="0.5">
             </div>
             <div>
-                <label class="mini-label" style="color: #00ffff;">PALABRAS/SEGM: <span id="mini-max-words-val">30</span></label>
-                <input type="range" id="mini-max-words" min="10" max="60" step="5" value="30" style="accent-color: #00ffff;">
+                <label class="mini-label" style="color: #00ffff;">PALABRAS/SEGM: <span id="mini-max-words-val">40</span></label>
+                <input type="range" id="mini-max-words" min="10" max="60" step="5" value="40" style="accent-color: #00ffff;">
             </div>
             <div>
-                <label class="mini-label" style="color: #ffff00;">PAUSA: <span id="mini-pause-time-val">0.5</span>s</label>
-                <input type="range" id="mini-pause-time" min="0.1" max="2.0" step="0.1" value="0.5" style="accent-color: #ffff00;">
+                <label class="mini-label" style="color: #ffff00;">PAUSA: <span id="mini-pause-time-val">0.1</span>s</label>
+                <input type="range" id="mini-pause-time" min="0.1" max="2.0" step="0.1" value="0.1" style="accent-color: #ffff00;">
             </div>
         </div>
         
