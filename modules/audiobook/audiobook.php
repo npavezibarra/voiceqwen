@@ -17,6 +17,7 @@ if (file_exists($composer_autoload)) {
 require_once plugin_dir_path(__FILE__) . 'includes/R2Client.php';
 require_once plugin_dir_path(__FILE__) . 'includes/PostTypes.php';
 require_once plugin_dir_path(__FILE__) . 'includes/Settings.php';
+require_once plugin_dir_path(__FILE__) . 'includes/CoverOptimizer.php';
 require_once plugin_dir_path(__FILE__) . 'includes/AudiobookManager.php';
 
 // 3. Initialize Module

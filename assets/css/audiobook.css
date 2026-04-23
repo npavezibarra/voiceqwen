@@ -226,6 +226,33 @@
     letter-spacing: -1px;
 }
 
+.vq-card-author {
+    margin-top: -10px;
+    font-size: 14px;
+    font-weight: 300;
+    letter-spacing: 0.2px;
+    color: #666;
+}
+
+.vq-card-author-input {
+    margin-top: -10px;
+    width: 100%;
+    max-width: 320px;
+    font-size: 14px;
+    font-weight: 300;
+    letter-spacing: 0.2px;
+    color: #222;
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    padding: 8px 10px;
+    outline: none;
+}
+.vq-card-author-input:focus {
+    border-color: #000;
+    box-shadow: 0 0 0 3px rgba(0,0,0,0.08);
+}
+
 .vq-card-meta {
     margin-bottom: 20px;
     font-size: 13px;
@@ -534,4 +561,3 @@
 .vq-chapter-edit:hover {
     background: #0000bb;
 }
-

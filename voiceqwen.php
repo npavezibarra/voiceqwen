@@ -60,6 +60,7 @@ function voiceqwen_enqueue_assets() {
     wp_enqueue_script( 'voiceqwen-file-manager', plugins_url( 'assets/js/file-manager.js', __FILE__ ), array( 'voiceqwen-core', 'voiceqwen-waveform-ui' ), '1.1', true );
 
     wp_enqueue_script( 'voiceqwen-audiobook', plugins_url( 'modules/audiobook/audiobook.js', __FILE__ ), array( 'voiceqwen-core' ), '1.0', true );
+    wp_enqueue_script( 'voiceqwen-audiobook-author', plugins_url( 'modules/audiobook/audiobook-author.js', __FILE__ ), array( 'voiceqwen-audiobook' ), '1.0', true );
     
     $upload_dir = wp_upload_dir();
     $current_user = wp_get_current_user();

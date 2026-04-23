@@ -18,6 +18,7 @@ class AudiobookManager
         // AJAX handlers
         $actions = array(
             'vq_create_book',
+            'vq_update_book_author',
             'vq_save_playlist',
             'vq_upload_chapter',
             'vq_get_book_editor',
@@ -113,9 +114,18 @@ class AudiobookManager
 
                 <div class="vq-card-info">
                     <h3><?php echo esc_html($post->post_title); ?></h3>
-                    <div class="vq-card-meta">
-                        <span class="vq-author"><?php echo esc_html($author); ?></span>
-                    </div>
+                    <?php if (!empty($author)): ?>
+                        <div class="vq-card-author"><?php echo esc_html($author); ?></div>
+                    <?php else: ?>
+                        <input
+                            type="text"
+                            class="vq-card-author-input"
+                            placeholder="Author..."
+                            value=""
+                            autocomplete="off"
+                            spellcheck="false"
+                        >
+                    <?php endif; ?>
                 </div>
                 <div class="vq-card-actions">
                     <button class="nav-btn vq-upload-cover-btn" data-id="<?php echo $post->ID; ?>">
@@ -223,6 +233,27 @@ class AudiobookManager
         wp_send_json_error('Failed to create book');
     }
 
+    public static function ajax_update_book_author(): void
+    {
+        check_ajax_referer('voiceqwen_nonce', 'nonce');
+        if (!is_user_logged_in()) wp_send_json_error('Unauthorized');
+
+        $post_id = isset($_POST['post_id']) ? intval($_POST['post_id']) : 0;
+        $author = isset($_POST['author']) ? sanitize_text_field($_POST['author']) : '';
+
+        $post = $post_id ? get_post($post_id) : null;
+        if (!$post || $post->post_type !== 'audiobook') {
+            wp_send_json_error('Invalid book ID');
+        }
+
+        if (!current_user_can('edit_post', $post_id)) {
+            wp_send_json_error('Unauthorized');
+        }
+
+        update_post_meta($post_id, '_vq_author', $author);
+        wp_send_json_success(array('author' => $author));
+    }
+
     public static function ajax_save_playlist(): void
     {
         check_ajax_referer('voiceqwen_nonce', 'nonce');
@@ -276,18 +307,42 @@ class AudiobookManager
         }
 
         $file = $_FILES['file'];
-        $filename = sanitize_file_name($file['name']);
         $mode = get_option('voiceqwen_storage_mode', 'local');
 
+        $optimized = CoverOptimizer::optimize_to_jpeg($file['tmp_name'], 600000, 1200);
+        if (!empty($optimized['error'])) {
+            wp_send_json_error('Cover optimization failed: ' . $optimized['error']);
+        }
+        $optimized_path = $optimized['path'];
+
+        $stamp = time();
+        $key = 'covers/' . $post_id . '_' . $stamp . '.jpg';
+
         if ($mode === 'r2') {
-            $r2_key = 'covers/' . $post_id . '_' . $filename;
             $r2 = new R2Client();
-            if ($r2->upload_object($file['tmp_name'], $r2_key, $file['type'])) {
-                update_post_meta($post_id, '_vq_cover_key', $r2_key);
+            if ($r2->upload_object($optimized_path, $key, 'image/jpeg')) {
+                update_post_meta($post_id, '_vq_cover_key', $key);
+                @unlink($optimized_path);
                 wp_send_json_success(self::get_cover_url($post_id));
             }
         } else {
-            // Local fallback logic can be added here if needed
+            $upload_dir = wp_upload_dir();
+            $base_dir = rtrim($upload_dir['basedir'], '/') . '/voiceqwen-audiobook';
+            $abs = $base_dir . '/' . $key;
+            $abs_dir = dirname($abs);
+            if (!file_exists($abs_dir)) {
+                @mkdir($abs_dir, 0755, true);
+            }
+
+            $ok = @copy($optimized_path, $abs);
+            @unlink($optimized_path);
+            if ($ok) {
+                update_post_meta($post_id, '_vq_cover_key', $key);
+                wp_send_json_success(self::get_cover_url($post_id));
+            }
+        }
+        if ($optimized_path && file_exists($optimized_path)) {
+            @unlink($optimized_path);
         }
         wp_send_json_error('Upload failed');
     }
