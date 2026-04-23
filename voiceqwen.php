@@ -27,6 +27,12 @@ function voiceqwen_custom_template( $template ) {
             return $custom_template;
         }
     }
+    if ( is_page( 'audi' ) ) {
+        $custom_template = plugin_dir_path( __FILE__ ) . 'templates/audi-template.php';
+        if ( file_exists( $custom_template ) ) {
+            return $custom_template;
+        }
+    }
     return $template;
 }
 add_filter( 'template_include', 'voiceqwen_custom_template', 99 );
@@ -41,12 +47,14 @@ function voiceqwen_enqueue_assets() {
     wp_enqueue_script( 'wavesurfer', 'https://unpkg.com/wavesurfer.js@7.12.6/dist/wavesurfer.min.js', array(), '7.12.6', true );
     wp_enqueue_script( 'wavesurfer-regions', 'https://unpkg.com/wavesurfer.js@7.12.6/dist/plugins/regions.min.js', array( 'wavesurfer' ), '7.12.6', true );
     wp_enqueue_script( 'wavesurfer-timeline', 'https://unpkg.com/wavesurfer.js@7.12.6/dist/plugins/timeline.min.js', array( 'wavesurfer' ), '7.12.6', true );
+    wp_enqueue_script( 'sortablejs', 'https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js', array(), '1.15.0', true );
 
     wp_enqueue_script( 'voiceqwen-core', plugins_url( 'assets/js/core.js', __FILE__ ), array( 'jquery' ), '1.1', true );
     wp_enqueue_script( 'voiceqwen-generation', plugins_url( 'assets/js/generation.js', __FILE__ ), array( 'voiceqwen-core' ), '1.1', true );
     wp_enqueue_script( 'voiceqwen-avatar-manager', plugins_url( 'assets/js/avatar-manager.js', __FILE__ ), array( 'voiceqwen-core' ), '1.1', true );
     wp_enqueue_script( 'voiceqwen-waveform-logic', plugins_url( 'assets/js/waveform-logic.js', __FILE__ ), array( 'jquery' ), '1.1', true );
     wp_enqueue_script( 'voiceqwen-waveform-ui', plugins_url( 'assets/js/waveform-ui.js', __FILE__ ), array( 'voiceqwen-core', 'wavesurfer', 'voiceqwen-waveform-logic' ), '1.1', true );
+    wp_enqueue_script( 'voiceqwen-waveform-ruler-controls', plugins_url( 'assets/js/waveform-ruler-controls.js', __FILE__ ), array( 'voiceqwen-waveform-ui' ), '1.1', true );
     wp_enqueue_script( 'voiceqwen-file-manager', plugins_url( 'assets/js/file-manager.js', __FILE__ ), array( 'voiceqwen-core', 'voiceqwen-waveform-ui' ), '1.1', true );
 
     wp_enqueue_script( 'voiceqwen-audiobook', plugins_url( 'modules/audiobook/audiobook.js', __FILE__ ), array( 'voiceqwen-core' ), '1.0', true );
@@ -111,6 +119,7 @@ function voiceqwen_ui_shortcode() {
                     <button class="nav-btn" data-view="waveform">WAVE VIEWER</button>
                     <button class="nav-btn" data-view="audiobook">AUDIOBOOK</button>
                     <button class="nav-btn" data-view="upload-voice">UPLOAD VOICE</button>
+                    <button class="nav-btn" data-view="settings">CONFIG</button>
                 </div>
             </div>
             
@@ -125,6 +134,7 @@ function voiceqwen_ui_shortcode() {
                 <?php voiceqwen_audiobook_render_ui(); ?>
                 <?php include plugin_dir_path( __FILE__ ) . 'templates/views/view-analysis.php'; ?>
                 <?php include plugin_dir_path( __FILE__ ) . 'templates/views/view-waveform.php'; ?>
+                <?php include plugin_dir_path( __FILE__ ) . 'templates/views/view-settings.php'; ?>
             </div>
 
             <?php if ( ! empty( $deco_text ) ) : ?>
@@ -162,3 +172,28 @@ function voiceqwen_add_to_menu( $page_id ) {
         ) );
     }
 }
+
+// 6. Ensure Pages Exist
+function voiceqwen_ensure_pages() {
+    $pages = array(
+        'voice' => 'LOCUTOR',
+        'audi'  => 'Audi'
+    );
+
+    foreach ( $pages as $slug => $title ) {
+        $page = get_page_by_path( $slug );
+        if ( ! $page ) {
+            $page_id = wp_insert_post( array(
+                'post_title'   => $title,
+                'post_content' => ( $slug === 'voice' ) ? '[voiceqwen_ui]' : '',
+                'post_status'  => 'publish',
+                'post_type'    => 'page',
+                'post_name'    => $slug,
+            ) );
+            if ( $slug === 'voice' ) {
+                voiceqwen_add_to_menu( $page_id );
+            }
+        }
+    }
+}
+add_action( 'admin_init', 'voiceqwen_ensure_pages' );

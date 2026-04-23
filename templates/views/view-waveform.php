@@ -1,5 +1,5 @@
 <?php if ( ! defined( 'ABSPATH' ) ) exit; ?>
-<div class="vapor-window main view-pane hidden" id="view-waveform">
+<div class="vapor-window main view-pane view-container hidden" id="view-waveform">
     <div class="vapor-window-header" style="display: flex; justify-content: space-between; align-items: center; padding-right: 15px;">
         <div style="display: flex; align-items: center;">
             <div class="vapor-dots"><span></span><span></span><span></span></div>
@@ -18,9 +18,8 @@
         </div>
         <div id="wave-viewer-container" class="hidden">
             <div id="waveform-title" style="margin-bottom: 10px; font-weight: bold; color: #ff00ff; font-size: 20px;"></div>
-            <div id="waveform" style="background: #0d0d2b; border: 3px solid #0000ff; margin-bottom: 5px; position: relative; min-height: 128px;"></div>
-
-            <div id="wave-timeline" style="margin-bottom: 15px; font-size: 10px; color: #888;"></div>
+            <div id="waveform" style="background: #0d0d2b; border: 3px solid #0000ff; margin-bottom: 0; position: relative; min-height: 128px;"></div>
+            <div id="wave-timeline"></div>
             <div id="wave-controls" style="display: flex; gap: 15px; align-items: center; justify-content: center; padding: 10px; background: rgba(0,0,255,0.05); border: 2px solid #0000ff; flex-wrap: wrap;">
                 <button id="wave-play-pause" type="button" class="nav-btn wave-control-btn" style="width: auto; margin: 0; min-width: 100px;">PLAY</button>
                 <button id="wave-region-delete" type="button" class="nav-btn hidden" style="width: auto; margin: 0; background: #ff00ff; color: #fff; font-weight: bold; border: 2px solid #000;">DELETE SELECTION</button>

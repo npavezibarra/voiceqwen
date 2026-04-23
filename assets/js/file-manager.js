@@ -5,6 +5,10 @@ jQuery(document).ready(function ($) {
     window.VoiceQwen = window.VoiceQwen || {};
     window.VoiceQwen.loadFiles = loadFileList;
     window.VoiceQwen.getPath = () => currentPath;
+    window.VoiceQwen.setPath = (newPath) => {
+        currentPath = (newPath || '').replace(/^\/+/, '');
+        renderCurrentPath();
+    };
 
     function loadFileList() {
         $.post(voiceqwen_ajax.url, {
@@ -49,7 +53,7 @@ jQuery(document).ready(function ($) {
                             <span class="${isFolder ? 'folder-icon' : 'file-icon'}"></span>
                             <span class="${isFolder ? 'folder-name' : 'file-name'}">${item.name}</span>
                         </div>
-                        ${isFolder ? '<span style="font-size:10px; opacity:0.5;">ENTRAR ➡️</span>' : '<span class="trash-btn">🗑️</span>'}
+                        ${isFolder ? '<span style="font-size:10px; opacity:0.5;">ENTRAR ➡️</span>' : '<div style="display:flex; gap:4px;"><span class="send-to-ab-btn" title="Send to Audiobook">📀</span><span class="trash-btn">🗑️</span></div>'}
                     </div>
                 </li>`);
 
@@ -57,17 +61,18 @@ jQuery(document).ready(function ($) {
                     $li.on('click', () => { currentPath = item.rel_path; renderCurrentPath(); });
                 } else {
                     $li.on('click', (e) => {
-                        if ($(e.target).closest('.trash-btn').length) return;
+                        if ($(e.target).closest('.trash-btn').length || $(e.target).closest('.send-to-ab-btn').length) return;
                         
                         if (typeof window.VoiceQwen.loadWaveform === 'function') {
                             // Switch view to waveform first
                             $('.vapor-nav .nav-btn[data-view="waveform"]').click();
-                            window.VoiceQwen.loadWaveform(item.url, item.name, item.has_backup, item.has_autosave, item.autosave_url);
+                            window.VoiceQwen.loadWaveform(item.url, item.name, item.has_backup, item.has_autosave, item.autosave_url, item.rel_path);
                         } else {
                             playAudio(item.url, item.name);
                         }
                     });
                     $li.on('click', '.trash-btn', (e) => { e.stopPropagation(); if (confirm(`¿Borrar ${item.name}?`)) deleteFile(item.rel_path); });
+                    $li.on('click', '.send-to-ab-btn', (e) => { e.stopPropagation(); sendToAudiobook(item.rel_path); });
                 }
                 setupDraggable($li);
                 $list.append($li);
@@ -115,6 +120,51 @@ jQuery(document).ready(function ($) {
                 <div style="font-size:12px; color:blue; margin-bottom:5px;">${filename}</div>
                 <audio controls autoplay src="${url}" style="width:100%; height:30px;"></audio>
             </div>`);
+    }
+
+    function sendToAudiobook(relPath) {
+        const $modal = $('#mini-modal');
+        const $content = $modal.find('.modal-body');
+        
+        $modal.find('h3').text('Enviar a Audiobook');
+        $content.html('<p>Cargando libros...</p>');
+        $modal.fadeIn();
+
+        // Use the new namespaced action to get books
+        $.post(voiceqwen_ajax.url, {
+            action: 'vq_get_books',
+            nonce: voiceqwen_ajax.nonce
+        }, function(response) {
+            if (response.success && response.data.length > 0) {
+                let html = '<ul class="vapor-list" style="max-height:200px; overflow-y:auto;">';
+                response.data.forEach(book => {
+                    html += `<li class="book-choice" data-id="${book.id}" style="cursor:pointer; padding:8px; border-bottom:1px solid #ccc;">${book.title}</li>`;
+                });
+                html += '</ul>';
+                $content.html(html);
+
+                $('.book-choice').on('click', function() {
+                    const bookId = $(this).data('id');
+                    $content.html('<p>Subiendo a Cloudflare R2...</p>');
+                    
+                    $.post(voiceqwen_ajax.url, {
+                        action: 'voiceqwen_send_to_audiobook',
+                        nonce: voiceqwen_ajax.nonce,
+                        item_rel: relPath,
+                        book_id: bookId
+                    }, function(res) {
+                        if (res.success) {
+                            $content.html(`<p style="color:green;">✓ ${res.data}</p>`);
+                            setTimeout(() => $modal.fadeOut(), 1500);
+                        } else {
+                            $content.html(`<p style="color:red;">✗ ${res.data}</p>`);
+                        }
+                    });
+                });
+            } else {
+                $content.html('<p>No se encontraron audiobooks creados.</p>');
+            }
+        });
     }
 
     $(document).on('click', '#sidebar-new-folder-btn', () => {

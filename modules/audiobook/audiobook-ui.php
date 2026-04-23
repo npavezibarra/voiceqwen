@@ -1,70 +1,85 @@
-<!-- View 6: Audiobook -->
+<?php if ( ! defined( 'ABSPATH' ) ) exit; ?>
+<!-- View: Audiobook Manager -->
 <div class="vapor-window main view-pane hidden" id="view-audiobook">
-    <div class="audiobook-workspace">
-        <!-- Col 1: Books -->
-        <div class="audiobook-col book-col">
-            <div class="col-header">
-                <h3>LIBROS</h3>
-                <button id="add-book-btn" class="nav-btn" title="Nuevo Libro">+</button>
+    <div class="audiobook-manager-wrap">
+        <div class="audiobook-header">
+            <div class="header-left">
+                <span class="vapor-icon">🎧</span>
+                <h2>AUDIOBOOK MANAGER</h2>
             </div>
-            
-            <div id="book-create-form" class="mini-form hidden">
-                <input type="text" id="new-book-title" placeholder="Título...">
-                <input type="text" id="new-book-author" placeholder="Autor...">
-                <button id="confirm-book-btn" class="vapor-btn-main">OK</button>
+            <div class="header-right">
+                <button id="vq-create-book-btn" class="nav-btn">+ CREATE NEW</button>
             </div>
-
-            <ul id="audiobook-list" class="vapor-list">
-                <li class="loading">Cargando libros...</li>
-            </ul>
         </div>
 
-        <!-- Col 2: Chapters -->
-        <div class="audiobook-col chapter-col">
-            <div class="col-header">
-                <h3>CAPÍTULOS</h3>
-                <button id="add-chapter-btn" class="nav-btn" title="Nuevo Capítulo" disabled>+</button>
-            </div>
-            
-            <div id="chapter-create-form" class="mini-form hidden">
-                <input type="text" id="new-chapter-title" placeholder="Ej: Capítulo 1">
-                <button id="confirm-chapter-btn" class="vapor-btn-main">ADD</button>
+        <div class="audiobook-split">
+            <!-- Sidebar: List of Audiobooks -->
+            <div class="audiobook-list-column">
+                <div class="audiobook-list-header">
+                    <h3>ALBUMS / BOOKS</h3>
+                </div>
+                <div id="vq-book-list-container" class="audiobook-list-container">
+                    <!-- Populated via PHP or AJAX -->
+                    <?php
+                    $books = get_posts(array(
+                        'post_type' => 'audiobook',
+                        'posts_per_page' => -1,
+                        'post_status' => 'publish'
+                    ));
+                    if (empty($books)): ?>
+                        <p class="no-books">No audiobooks found.</p>
+                    <?php else: ?>
+                        <?php foreach ($books as $book): 
+                            $author = get_post_meta($book->ID, '_vq_author', true);
+                            $cover_url = \VoiceQwen\Audiobook\AudiobookManager::get_cover_url($book->ID);
+                        ?>
+                            <div class="vq-book-item" data-id="<?php echo $book->ID; ?>">
+                                <div class="vq-book-item-thumb">
+                                    <?php if ($cover_url): ?>
+                                        <img src="<?php echo esc_url($cover_url); ?>" alt="">
+                                    <?php else: ?>
+                                        <div class="vq-thumb-placeholder"></div>
+                                    <?php endif; ?>
+                                </div>
+                                <div class="vq-book-item-content">
+                                    <span class="vq-book-item-title"><?php echo esc_html($book->post_title); ?></span>
+                                    <span class="vq-book-item-author"><?php echo esc_html($author); ?></span>
+                                </div>
+                                <div class="vq-book-item-arrow">›</div>
+                            </div>
+                        <?php endforeach; ?>
+                    <?php endif; ?>
+                </div>
             </div>
 
-            <ul id="chapter-list" class="vapor-list">
-                <li class="empty-hint">Selecciona un libro</li>
-            </ul>
+            <!-- Main Panel: Editor -->
+            <div id="vq-editor-panel" class="audiobook-editor-column">
+                <div class="welcome-state">
+                    <div class="welcome-content">
+                        <span class="welcome-icon">💿</span>
+                        <h3>Select an audiobook to edit</h3>
+                        <p>Double-click on an item from the list to reveal its chapters and settings.</p>
+                    </div>
+                </div>
+            </div>
         </div>
 
-        <!-- Col 3: Editor -->
-        <div class="audiobook-col editor-col">
-            <div class="col-header">
-                <h3 id="active-chapter-title">EDITOR</h3>
-            </div>
-            
-            <div id="audiobook-editor-ui" class="hidden">
-                <div class="voice-selector" id="audiobook-voice-selector">
-                    <!-- Populated via JS -->
+        <!-- Create Book Modal -->
+        <div id="vq-book-modal" class="vapor-modal hidden">
+            <div class="vapor-modal-content">
+                <h3>New Audiobook</h3>
+                <div class="form-group">
+                    <label>Title</label>
+                    <input type="text" id="vq-new-book-title" placeholder="Book Title...">
                 </div>
-
-                <div class="form-group" style="margin-top:15px;">
-                    <textarea id="audiobook-text" style="height: calc(100vh - 450px);" placeholder="Escribe el contenido del capítulo aquí..."></textarea>
+                <div class="form-group">
+                    <label>Author</label>
+                    <input type="text" id="vq-new-book-author" placeholder="Author Name...">
                 </div>
-
-                <div class="stability-control" style="margin: 15px 0; padding: 10px; background: rgba(255,0,255,0.05); border: 1px solid #ff00ff;">
-                    <label style="display: block; font-weight: bold; margin-bottom: 5px; color: #ff00ff;">ESTABILIDAD: <span id="audiobook-stability-val">0.7</span></label>
-                    <input type="range" id="audiobook-stability" min="0.1" max="1.0" step="0.1" value="0.7" style="width: 100%; cursor: pointer;">
+                <div class="modal-actions">
+                    <button id="vq-modal-close" class="nav-btn">Cancel</button>
+                    <button id="vq-modal-confirm" class="vapor-btn-main">Save</button>
                 </div>
-
-                <div class="controls">
-                    <button id="generate-audiobook-btn" class="vapor-btn-main">GENERAR AUDIO</button>
-                    <button id="save-chapter-btn" class="nav-btn" style="margin-top: 10px; width: 100%;">GUARDAR CAMBIOS</button>
-                </div>
-                <div id="audiobook-status-msg"></div>
-            </div>
-
-            <div id="editor-empty-hint" class="empty-hint" style="padding: 40px; text-align: center;">
-                Selecciona un capítulo para editar
             </div>
         </div>
     </div>

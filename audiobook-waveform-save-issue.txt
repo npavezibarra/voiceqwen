@@ -1,0 +1,38 @@
+Problema: Guardado de edición Waveform en capítulos de Audiobook (archivos “clip*” huérfanos + guardado en carpeta equivocada)
+
+Contexto
+- En el módulo Audiobook existe una lista/playlist de capítulos.
+- Al editar un capítulo desde esa lista, se abre el editor de waveform.
+- El editor permite modificar el audio “original” del capítulo:
+  - Cortar y eliminar secciones.
+  - Insertar nuevas voces a partir de texto (generando audio adicional).
+  - Guardar los cambios sobrescribiendo el archivo del capítulo.
+
+Comportamiento observado (actual)
+1) Al insertar una nueva voz en el editor, el sistema genera un archivo temporal dentro de la carpeta del audiobook con nombre tipo:
+   - “clip{algo}.wav” (o “clip-{algo}.wav”)
+   Este clip corresponde al segmento que se inserta en el archivo del capítulo.
+
+2) Luego de escuchar el resultado y presionar GUARDAR:
+   - El clip “clip{algo}” NO se borra automáticamente.
+   - En la carpeta del audiobook (ej: “insurreccion-fernando-villegas/”) se acumulan muchos archivos “clip{algo}”, lo que indica que el sistema generó e insertó el audio, pero no limpió los temporales.
+
+3) Además, el archivo editado final se guarda en una ubicación incorrecta:
+   - Quedan dos archivos con el mismo nombre de capítulo (ej: “insurreccion-introduccion”):
+     - Uno dentro de la carpeta del audiobook: “insurreccion-fernando-villegas/insurreccion-introduccion.wav” (capítulo original en su lugar correcto).
+     - Otro fuera de esa carpeta, en la raíz del usuario (root de `wp_upload_dir()/voiceqwen/<username>/`).
+   - El archivo que contiene las inserciones (el que realmente tiene los cambios) es el que queda en la raíz, lo cual está mal.
+
+Comportamiento esperado (objetivo)
+- Al presionar GUARDAR en el editor:
+  1) Se debe sobrescribir el archivo del capítulo en su ubicación original (dentro de la carpeta del audiobook), por ejemplo:
+     - `.../voiceqwen/<username>/insurreccion-fernando-villegas/insurreccion-introduccion.wav`
+  2) Los clips temporales generados para inserciones (archivos “clip{algo}”) deben eliminarse automáticamente una vez aplicado el guardado exitoso.
+
+Impacto
+- Basura de archivos temporales “clip*” que crece con cada edición.
+- Riesgo de desincronización entre el capítulo “real” dentro del audiobook y el archivo editado que queda fuera de la carpeta.
+- Confusión operativa (parece que el capítulo fue editado, pero el capítulo dentro del audiobook no queda actualizado).
+
+Notas adicionales
+- El sistema sí genera e inserta correctamente los clips durante la edición; el problema es la etapa final de persistencia/guardado y limpieza.

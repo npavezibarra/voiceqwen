@@ -17,12 +17,16 @@ jQuery(document).ready(function ($) {
         const $btn = $(this);
         const $status = $('#status-msg');
         const stability = $('#tts-stability').val();
+        const maxWords = $('#tts-max-words').val();
+        const pauseTime = $('#tts-pause-time').val();
 
         const formData = new FormData();
         formData.append('action', 'voiceqwen_generate_audio');
         formData.append('nonce', voiceqwen_ajax.nonce);
         formData.append('voice', voice);
         formData.append('stability', stability);
+        formData.append('max_words', maxWords);
+        formData.append('pause_time', pauseTime);
 
         if (activeTab === 'textarea') {
             const text = $('#tts-text').val();
@@ -74,6 +78,8 @@ jQuery(document).ready(function ($) {
         const $btn = $(this);
         const $status = $('#dialogue-status-msg');
         const stability = $('#dialogue-stability').val();
+        const maxWords = $('#dialogue-max-words').val();
+        const pauseTime = $('#dialogue-pause-time').val();
 
         if (!text) {
             $status.text('Error: Texto vacío').css('color', 'red');
@@ -85,6 +91,8 @@ jQuery(document).ready(function ($) {
         formData.append('nonce', voiceqwen_ajax.nonce);
         formData.append('text', text);
         formData.append('stability', stability);
+        formData.append('max_words', maxWords);
+        formData.append('pause_time', pauseTime);
 
         $btn.prop('disabled', true).text('Procesando...');
         $status.text('Iniciando diálogo en segundo plano...').css('color', '#000');
@@ -281,7 +289,11 @@ jQuery(document).ready(function ($) {
         $.post(voiceqwen_ajax.url, { action: 'voiceqwen_reset_status', nonce: voiceqwen_ajax.nonce });
     });
 
-    $(document).on('input', '#tts-stability, #dialogue-stability', function() {
-        $(this).next('.stability-val').text($(this).val());
-    });
+    $(document).on('input', '#tts-stability', function() { $('#stability-val').text($(this).val()); });
+    $(document).on('input', '#tts-max-words', function() { $('#max-words-val').text($(this).val()); });
+    $(document).on('input', '#tts-pause-time', function() { $('#pause-time-val').text($(this).val()); });
+
+    $(document).on('input', '#dialogue-stability', function() { $('#dialogue-stability-val').text($(this).val()); });
+    $(document).on('input', '#dialogue-max-words', function() { $('#dialogue-max-words-val').text($(this).val()); });
+    $(document).on('input', '#dialogue-pause-time', function() { $('#dialogue-pause-time-val').text($(this).val()); });
 });

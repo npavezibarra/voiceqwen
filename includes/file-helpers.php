@@ -60,19 +60,26 @@ function voiceqwen_get_file_tree( $dir, $base_url, $relative_path = '' ) {
 
             $has_backup = file_exists( $path . '.original.wav' );
             $has_autosave = file_exists( $path . '-autosave.wav' );
+            $mtime = @filemtime( $path );
+            if ( ! $mtime ) $mtime = time();
             
             // Encode the relative path correctly
             $rel_parts = explode('/', $rel);
             $encoded_rel = implode('/', array_map('rawurlencode', $rel_parts));
             $final_base_url = set_url_scheme($base_url);
             
-            $autosave_url = $has_autosave ? $final_base_url . $encoded_rel . '-autosave.wav' : '';
+            $autosave_url = '';
+            if ( $has_autosave ) {
+                $autosave_mtime = @filemtime( $path . '-autosave.wav' );
+                if ( ! $autosave_mtime ) $autosave_mtime = time();
+                $autosave_url = $final_base_url . $encoded_rel . '-autosave.wav?v=' . $autosave_mtime;
+            }
 
             $tree[] = array(
                 'type'         => 'file',
                 'name'         => $item,
                 'rel_path'     => $rel,
-                'url'          => $final_base_url . $encoded_rel,
+                'url'          => $final_base_url . $encoded_rel . '?v=' . $mtime,
                 'has_backup'   => $has_backup,
                 'has_autosave' => $has_autosave,
                 'autosave_url' => $autosave_url

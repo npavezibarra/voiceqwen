@@ -223,3 +223,54 @@ function voiceqwen_delete_file() {
     }
 }
 add_action( 'wp_ajax_voiceqwen_delete_file', 'voiceqwen_delete_file' );
+
+/**
+ * AJAX: Send a local file to an Audiobook (Uploads to R2 and adds to playlist)
+ */
+function voiceqwen_send_to_audiobook() {
+    check_ajax_referer( 'voiceqwen_nonce', 'nonce' );
+    if ( ! is_user_logged_in() ) wp_send_json_error();
+
+    $item_rel = sanitize_text_field( $_POST['item_rel'] );
+    $book_id = intval( $_POST['book_id'] );
+
+    if ( ! $book_id ) wp_send_json_error( 'ID de libro inválido' );
+
+    $current_user = wp_get_current_user();
+    $username = $current_user->user_login;
+    $upload_dir = wp_upload_dir();
+    $user_dir = $upload_dir['basedir'] . '/voiceqwen/' . $username;
+    $file_path = $user_dir . '/' . $item_rel;
+
+    if ( ! file_exists( $file_path ) ) wp_send_json_error( 'Archivo no encontrado' );
+
+    // Prepare for R2 upload
+    $r2 = new \VoiceQwen\Audiobook\R2Client();
+    $book = get_post( $book_id );
+    if ( ! $book ) wp_send_json_error( 'Libro no encontrado' );
+
+    $book_title = sanitize_file_name( $book->post_title );
+    $filename = basename( $file_path );
+    $r2_key = $book_title . '/' . $filename;
+
+    $ext = strtolower( pathinfo( $filename, PATHINFO_EXTENSION ) );
+    $mime_type = ( $ext === 'mp3' ) ? 'audio/mpeg' : 'audio/wav';
+
+    if ( $r2->upload_object( $file_path, $r2_key, $mime_type ) ) {
+        // Add to playlist
+        $playlist = get_post_meta( $book_id, '_vq_playlist', true );
+        $playlist = is_array( $playlist ) ? $playlist : ( json_decode( $playlist, true ) ?: [] );
+        
+        $playlist[] = array(
+            'id'    => uniqid(),
+            'title' => pathinfo( $filename, PATHINFO_FILENAME ),
+            'key'   => $r2_key
+        );
+        
+        update_post_meta( $book_id, '_vq_playlist', $playlist );
+        wp_send_json_success( 'Archivo enviado al audiobook y subido a R2' );
+    } else {
+        wp_send_json_error( 'Error al subir a Cloudflare R2. Verifica la configuración.' );
+    }
+}
+add_action( 'wp_ajax_voiceqwen_send_to_audiobook', 'voiceqwen_send_to_audiobook' );

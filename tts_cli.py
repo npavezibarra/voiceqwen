@@ -185,6 +185,8 @@ def main():
         parser.add_argument("--output", type=str, required=True, help="Output wav file path")
         parser.add_argument("--status_file", type=str, help="Path to status.json file")
         parser.add_argument("--stability", type=float, default=0.7, help="Stability (0.1-1.0)")
+        parser.add_argument("--max_words", type=int, default=30, help="Máximo de palabras por segmento")
+        parser.add_argument("--pause_time", type=float, default=0.5, help="Pausa entre segmentos (segundos)")
         args = parser.parse_args()
 
         if args.voice not in VOICES:
@@ -207,7 +209,8 @@ def main():
         # Proactive cleanup
         gc.collect()
 
-        chunks = get_safe_chunks(args.text)
+        # Process chunking with user defined max_words
+        chunks = get_safe_chunks(args.text, max_words=args.max_words)
         total_chunks = len(chunks)
         print(f"Dividido en {total_chunks} fragmentos.", flush=True)
         
@@ -255,7 +258,7 @@ def main():
             )
             
             # Prepare chunk with pause
-            pause = np.zeros(int(SR * 1.2))
+            pause = np.zeros(int(SR * args.pause_time))
             complete_audio = np.concatenate([wavs[0], pause])
             manager.save_chunk(i, complete_audio, SR)
             

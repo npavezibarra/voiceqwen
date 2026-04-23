@@ -1,26 +1,537 @@
-/* Audiobook Module Styles */
-.audiobook-workspace {
-    display: flex; height: calc(100vh - 250px); width: 100%; border-radius: 8px; overflow: hidden; margin-top: 20px;
+/**
+ * VoiceQwen Audiobook Manager Styles
+ * Professional Black & White Aesthetic
+ */
+
+.audiobook-manager-wrap {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    background: #fff;
+    color: #000;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 }
 
-.voiceqwen-theme-90ties .audiobook-workspace {
-    background: rgba(0,0,0,0.6); border: 3px solid #ff00ff; box-shadow: 10px 10px 0 #000; font-family: 'VT323', monospace;
+.audiobook-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px 30px;
+    background: #000;
+    color: #fff;
+    border-bottom: 1px solid #000;
 }
 
-.voiceqwen-theme-minimal .audiobook-workspace {
-    background: #fff; border: 1px solid #e2e8f0; font-family: 'Montserrat', sans-serif;
+.audiobook-header h2 {
+    margin: 0;
+    font-size: 14px;
+    letter-spacing: 3px;
+    color: #fff;
+    text-transform: uppercase;
+    font-weight: 300;
 }
 
-.audiobook-col { display: flex; flex-direction: column; overflow-y: auto; border-right: 1px solid #e2e8f0; }
-.book-col { width: 250px; }
-.chapter-col { width: 300px; }
-.editor-col { flex: 1; border-right: none; }
-
-.col-header {
-    background: #000; color: #fff; padding: 12px 15px; display: flex; justify-content: space-between; align-items: center;
+.nav-btn {
+    background: #fff !important;
+    color: #000 !important;
+    border: 1px solid #000 !important;
+    font-size: 11px !important;
+    letter-spacing: 1px;
+    padding: 8px 15px !important;
+    text-transform: uppercase;
+    font-weight: 600 !important;
+    cursor: pointer;
+    transition: all 0.2s;
 }
 
-.voiceqwen-theme-minimal .col-header { background: #0f172a; }
+.nav-btn:hover {
+    background: #000 !important;
+    color: #fff !important;
+}
 
-.mini-form { padding: 15px; background: rgba(0,0,0,0.05); border-bottom: 1px solid #ddd; }
-.mini-form input { width: 100%; padding: 8px; margin-bottom: 5px; }
+/* Split Layout */
+.audiobook-split {
+    display: flex;
+    gap: 0;
+    height: calc(100% - 60px);
+    background: #fff;
+}
+
+.audiobook-list-column {
+    width: 320px;
+    background: #fcfcfc;
+    border-right: 1px solid #eee;
+    display: flex;
+    flex-direction: column;
+}
+
+.audiobook-list-header {
+    padding: 15px 20px;
+    background: #f5f5f5;
+    border-bottom: 1px solid #eee;
+    color: #000;
+}
+
+.audiobook-list-header h3 {
+    margin: 0;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    opacity: 0.6;
+}
+
+.audiobook-list-container {
+    flex-grow: 1;
+    overflow-y: auto;
+}
+
+/* Book Items */
+.vq-book-item {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    padding: 20px;
+    border-bottom: 1px solid #f0f0f0;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.vq-book-item:hover {
+    background: #fff;
+    border-left: 4px solid #000;
+}
+
+.vq-book-item.active {
+    background: #fff;
+    border-left: 4px solid #000;
+    box-shadow: inset 0 0 10px rgba(0,0,0,0.02);
+}
+
+.vq-book-item-thumb {
+    width: 45px;
+    height: 45px;
+    background: #000;
+    flex-shrink: 0;
+    overflow: hidden;
+}
+
+.vq-book-item-thumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.vq-thumb-placeholder {
+    width: 100%;
+    height: 100%;
+    background: #eee;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.vq-thumb-placeholder::after {
+    content: "🎧";
+    font-size: 20px;
+    opacity: 0.3;
+}
+
+.vq-book-item-content {
+    flex-grow: 1;
+    overflow: hidden;
+}
+
+.vq-book-item-title {
+    display: block;
+    font-size: 14px;
+    font-weight: 600;
+    color: #000;
+    margin-bottom: 3px;
+}
+
+.vq-book-item-author {
+    font-size: 11px;
+    color: #999;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* Editor Column */
+.audiobook-editor-column {
+    flex-grow: 1;
+    background: #fff;
+    padding: 40px;
+    overflow-y: auto;
+}
+
+.welcome-state {
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+}
+
+.welcome-content {
+    max-width: 300px;
+    color: #ccc;
+}
+
+.welcome-content h3 {
+    color: #000;
+    font-weight: 300;
+    font-size: 22px;
+    margin-bottom: 10px;
+}
+
+/* Card in Editor */
+.vq-card {
+    width: 100%;
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+.vq-card-header {
+    display: flex;
+    gap: 30px;
+    align-items: flex-start;
+    margin-bottom: 40px;
+    padding-bottom: 30px;
+    border-bottom: 1px solid #eee;
+}
+
+.vq-card-header-cover {
+    width: 140px;
+    height: 140px;
+    background: #000;
+    flex-shrink: 0;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+}
+
+.vq-mini-cover {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.vq-card-info {
+    flex-grow: 1;
+}
+
+.vq-card-info h3 {
+    margin: 0 0 15px 0;
+    font-size: 28px;
+    font-weight: 800;
+    letter-spacing: -1px;
+}
+
+.vq-card-meta {
+    margin-bottom: 20px;
+    font-size: 13px;
+    color: #666;
+}
+
+.vq-card-actions {
+    display: flex;
+    gap: 10px;
+}
+
+/* Playlist / Chapters */
+.vq-chapters-container {
+    margin-top: 40px;
+}
+
+.vq-chapters-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.vq-chapter-item {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    padding: 15px 0;
+    border-bottom: 1px solid #f9f9f9;
+}
+
+.vq-drag-handle {
+    cursor: grab;
+    color: #ddd;
+    font-size: 18px;
+}
+
+.vq-chapter-title {
+    flex-grow: 1;
+    background: transparent !important;
+    border: none !important;
+    color: #000 !important;
+    font-family: inherit;
+    font-size: 15px;
+    font-weight: 500;
+}
+
+.vq-chapter-title:focus {
+    outline: none;
+    border-bottom: 1px solid #000 !important;
+}
+
+.vq-chapter-actions {
+    display: flex;
+    gap: 10px;
+}
+
+.vq-chapter-actions button {
+    background: #fff;
+    border: 1px solid #eee;
+    color: #000;
+    cursor: pointer;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    transition: all 0.2s;
+}
+
+.vq-chapter-actions button:hover {
+    background: #000;
+    color: #fff;
+    border-color: #000;
+}
+
+/* Inline Player */
+.vq-inline-player {
+    background: #fbfbfb;
+    border-bottom: 1px solid #eee;
+    padding: 15px 25px;
+    margin: 0;
+}
+
+.vq-wavesurfer-preview {
+    height: 50px;
+    margin-bottom: 15px;
+}
+
+.vq-preview-time {
+    font-size: 11px;
+    color: #999;
+    font-family: monospace;
+}
+
+/* Upload Progress */
+.vq-upload-progress-container {
+    margin: 20px 0;
+    padding: 15px;
+    background: #fff;
+    border: 1px solid #eee;
+}
+
+.vq-progress-bar {
+    height: 2px;
+    background: #000;
+    transition: width 0.3s;
+}
+
+.vq-upload-status {
+    font-size: 11px;
+    color: #666;
+    display: block;
+    margin-top: 8px;
+}
+
+/* Modals */
+.vapor-modal {
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+}
+
+.vapor-modal-content {
+    background: #fff;
+    border: 1px solid #000;
+    padding: 40px;
+    width: 450px;
+    box-shadow: 0 30px 60px rgba(0,0,0,0.1);
+}
+
+.vapor-modal-content h3 {
+    margin-top: 0;
+    color: #000;
+    font-weight: 800;
+    font-size: 20px;
+    letter-spacing: -0.5px;
+}
+
+.form-group label {
+    color: #000;
+    font-weight: 700;
+    text-transform: uppercase;
+    font-size: 10px;
+    letter-spacing: 1px;
+}
+
+.form-group input {
+    border: 1px solid #eee;
+    border-radius: 0;
+    padding: 12px;
+}
+
+.form-group input:focus {
+    border-color: #000;
+}
+
+/* Sidebar button */
+.send-to-ab-btn {
+    filter: grayscale(1);
+    opacity: 0.5;
+}
+
+.send-to-ab-btn:hover {
+    filter: grayscale(0);
+    opacity: 1;
+}
+
+/* Settings View Overrides */
+#view-settings {
+    background: #fff;
+}
+
+#view-settings h3 {
+    color: #000 !important;
+    text-shadow: none !important;
+    font-weight: 800;
+}
+
+#view-settings label {
+    color: #666 !important;
+}
+
+#view-settings .vapor-input {
+    border: 1px solid #eee !important;
+    background: #fff !important;
+    color: #000 !important;
+}
+
+#view-settings .vapor-input:focus {
+    border-color: #000 !important;
+}
+
+.vapor-btn-main {
+    background: #000 !important;
+    color: #fff !important;
+    border: none !important;
+    padding: 15px !important;
+    font-weight: 700 !important;
+}
+
+/* Dropdown Menu */
+.vq-dropdown-wrap {
+    position: relative;
+    display: inline-block;
+}
+
+.vq-dropdown-menu {
+    display: none;
+    position: absolute;
+    right: 0;
+    top: calc(100% + 5px);
+    background: #fff;
+    border: 1px solid #000;
+    z-index: 1000;
+    min-width: 160px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+}
+
+.vq-dropdown-menu.show {
+    display: block;
+}
+
+.vq-dropdown-item {
+    padding: 12px 20px;
+    font-size: 11px;
+    text-transform: uppercase;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    cursor: pointer;
+    border-bottom: 1px solid #f0f0f0;
+    color: #000;
+    transition: all 0.2s;
+}
+
+.vq-dropdown-item:last-child {
+    border-bottom: none;
+}
+
+.vq-dropdown-item:hover {
+    background: #000;
+    color: #fff;
+}
+
+/* Badges & Sync */
+.vq-badge {
+    padding: 2px 6px;
+    font-size: 9px;
+    font-weight: 700;
+    text-transform: uppercase;
+    border-radius: 3px;
+    margin-left: 10px;
+}
+
+.vq-badge-local {
+    background: #eee;
+    color: #666;
+    border: 1px solid #ddd;
+}
+
+.vq-badge-r2 {
+    background: #000;
+    color: #fff;
+}
+
+.vq-sync-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 14px;
+    line-height: 1;
+    padding: 0 5px;
+    color: #007aff;
+    transition: all 0.2s;
+    vertical-align: middle;
+}
+
+.vq-sync-btn:hover {
+    transform: translateY(-2px);
+    color: #0056b3;
+}
+
+.vq-syncing {
+    animation: vq-pulse 1s infinite;
+}
+
+@keyframes vq-pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.5; }
+    100% { opacity: 1; }
+}
+
+
+
+.vq-chapter-edit {
+    background: #0000ff;
+    color: #fff;
+    border: 1px solid #000;
+    font-size: 9px;
+    padding: 2px 6px;
+    cursor: pointer;
+    font-weight: bold;
+    border-radius: 2px;
+}
+
+.vq-chapter-edit:hover {
+    background: #0000bb;
+}
+

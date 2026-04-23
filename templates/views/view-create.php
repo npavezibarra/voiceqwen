@@ -25,12 +25,26 @@
         </div>
     </div>
 
-    <div class="stability-control" style="margin: 15px 0; padding: 10px; background: rgba(255,0,255,0.05); border: 1px solid #ff00ff;">
-        <label style="display: block; font-weight: bold; margin-bottom: 5px; color: #ff00ff;">ESTABILIDAD VOCAL (TIMBRE): <span id="stability-val">0.7</span></label>
-        <input type="range" id="tts-stability" min="0.1" max="1.0" step="0.1" value="0.7" style="width: 100%; cursor: pointer;">
-        <div style="display: flex; justify-content: space-between; font-size: 11px; margin-top: 5px;">
-            <span>EXPRESIVO</span>
-            <span>ESTABLE (RECOMENDADO)</span>
+    <div class="stability-control" style="margin: 15px 0; padding: 10px; background: #fcfcfc; border: 1px solid #ccc;">
+        <div style="display: flex; gap: 20px; flex-wrap: wrap;">
+            <!-- Stability -->
+            <div style="flex: 1; min-width: 200px;">
+                <label style="display: block; font-weight: bold; margin-bottom: 5px; color: #333; font-size: 11px;">ESTABILIDAD: <span id="stability-val">0.7</span></label>
+                <input type="range" id="tts-stability" min="0.1" max="1.0" step="0.1" value="0.7" style="width: 100%; cursor: pointer; accent-color: #555;">
+                <div style="display: flex; justify-content: space-between; font-size: 9px; margin-top: 5px; color: #666;"><span>EXPRESIVO</span><span>ESTABLE</span></div>
+            </div>
+            <!-- Max Words -->
+            <div style="flex: 1; min-width: 200px;">
+                <label style="display: block; font-weight: bold; margin-bottom: 5px; color: #333; font-size: 11px;">MAX PALABRAS/SEGM.: <span id="max-words-val">30</span></label>
+                <input type="range" id="tts-max-words" min="10" max="60" step="5" value="30" style="width: 100%; cursor: pointer; accent-color: #555;">
+                <div style="display: flex; justify-content: space-between; font-size: 9px; margin-top: 5px; color: #666;"><span>CORTOS</span><span>LARGOS</span></div>
+            </div>
+            <!-- Pause Time -->
+            <div style="flex: 1; min-width: 200px;">
+                <label style="display: block; font-weight: bold; margin-bottom: 5px; color: #333; font-size: 11px;">PAUSA ENTRE SEGM.: <span id="pause-time-val">0.5</span>s</label>
+                <input type="range" id="tts-pause-time" min="0.1" max="2.0" step="0.1" value="0.5" style="width: 100%; cursor: pointer; accent-color: #555;">
+                <div style="display: flex; justify-content: space-between; font-size: 9px; margin-top: 5px; color: #666;"><span>RÁPIDO</span><span>LENTO</span></div>
+            </div>
         </div>
     </div>
 

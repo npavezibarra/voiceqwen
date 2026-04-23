@@ -62,7 +62,34 @@ jQuery(document).ready(function ($) {
     });
 
     // Toggle Sidebar button in Waveform view
-    $(document).on('click', '#toggle-sidebar-btn', function() {
+    if ($('#nav-audiobook').length) {
+        // /audi template: this button should behave like "Back to Audiobook editor".
+        $('#toggle-sidebar-btn')
+            .text('VOLVER')
+            .css({ background: '#000', color: '#fff', borderColor: '#000' });
+    }
+
+    $(document).on('click', '#toggle-sidebar-btn', function(e) {
+        if ($('#nav-audiobook').length) {
+            e.preventDefault();
+
+            // Switch back to the audiobook manager view.
+            $('.nav-item-btn').removeClass('active');
+            $('#nav-audiobook').addClass('active');
+            $('.view-container').removeClass('active').addClass('hidden').hide();
+            $('#view-audio-manager').addClass('active').removeClass('hidden').show();
+
+            // Hide waveform view (it is not a .view-container on /audi).
+            $('#view-waveform').addClass('hidden').hide();
+
+            // Re-open the last active book editor (chapters list).
+            if (window.VoiceQwen && typeof window.VoiceQwen.openAudiobookEditor === 'function' && window.VoiceQwen.lastAudiobookPostId) {
+                window.VoiceQwen.openAudiobookEditor(window.VoiceQwen.lastAudiobookPostId);
+            }
+            return;
+        }
+
+        // LOCUTOR UI: toggle the floating file sidebar overlay.
         $('.vapor-window.sidebar').toggleClass('hidden').css({ top: '60px', left: '20px' });
     });
 

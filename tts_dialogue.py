@@ -18,9 +18,9 @@ MODEL_NAME = "Qwen/Qwen3-TTS-12Hz-1.7B-Base"
 # Force CPU for absolute stability on Mac environments where MPS hangs
 DEVICE = "cpu"
 SR = 24000
-SPEAKER_PAUSE = 0.2  # Silencio entre diferentes hablantes
-CHUNK_PAUSE = 0.5    # Silencio entre fragmentos del mismo hablante (si el texto es muy largo)
-MAX_WORDS = 15       # Máximo de palabras por fragmento para estabilidad (reducido para brillo constante)
+SPEAKER_PAUSE_DEFAULT = 0.5
+CHUNK_PAUSE_DEFAULT = 0.5
+MAX_WORDS_DEFAULT = 30
 
 # Paths to assets
 ASSETS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'assets', 'voices')
@@ -77,7 +77,7 @@ def parse_dialogue(text):
             
     return segments
 
-def get_safe_chunks(text, max_words=MAX_WORDS):
+def get_safe_chunks(text, max_words=MAX_WORDS_DEFAULT):
     """Divide el texto buscando puntos para no cortar frases a la mitad."""
     sentences = re.split(r'(?<=[.!?]) +', text.replace('\n', ' '))
     chunks = []
@@ -203,6 +203,8 @@ def main():
         parser.add_argument("--output", type=str, required=True, help="Output wav file path")
         parser.add_argument("--status_file", type=str, help="Path to status.json file")
         parser.add_argument("--stability", type=float, default=0.7, help="Stability (0.1-1.0)")
+        parser.add_argument("--max_words", type=int, default=30, help="Máximo de palabras por segmento")
+        parser.add_argument("--pause_time", type=float, default=0.5, help="Pausa global (segundos)")
         args = parser.parse_args()
 
         segments = parse_dialogue(args.text)
@@ -235,14 +237,14 @@ def main():
         gc.collect()
         if DEVICE == "mps": torch.mps.empty_cache()
 
-        speaker_pause = np.zeros(int(SR * SPEAKER_PAUSE))
-        chunk_pause = np.zeros(int(SR * CHUNK_PAUSE))
+        speaker_pause = np.zeros(int(SR * args.pause_time))
+        chunk_pause = np.zeros(int(SR * args.pause_time))
 
         # Flatten segments into a simple list of task chunks with pauses built-in
         # to simplify resumption logic (one manifest entry per 'physical' wav chunk)
         generation_tasks = []
         for i, (voice_id, text) in enumerate(segments):
-            chunks = get_safe_chunks(text)
+            chunks = get_safe_chunks(text, max_words=args.max_words)
             for j, chunk_text in enumerate(chunks):
                 is_last_chunk = (j == len(chunks) - 1)
                 is_last_segment = (i == len(segments) - 1)

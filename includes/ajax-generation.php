@@ -70,6 +70,8 @@ function voiceqwen_generate_audio() {
 
     $voice = sanitize_text_field( $_POST['voice'] );
     $stability = isset( $_POST['stability'] ) ? floatval( $_POST['stability'] ) : 0.7;
+    $max_words = isset( $_POST['max_words'] ) ? intval( $_POST['max_words'] ) : 30;
+    $pause_time = isset( $_POST['pause_time'] ) ? floatval( $_POST['pause_time'] ) : 0.5;
 
     if ( empty( $text ) ) wp_send_json_error( 'El texto está vacío.' );
 
@@ -77,7 +79,6 @@ function voiceqwen_generate_audio() {
     $sentences = preg_split('/(?<=[.!?])\s+/', $text_clean, -1, PREG_SPLIT_NO_EMPTY);
     $total_frags = 1;
     if (!empty($sentences)) {
-        $max_words = 15;
         $current_chunk_words = 0;
         $frag_count = 0;
         foreach ($sentences as $s) {
@@ -129,11 +130,11 @@ function voiceqwen_generate_audio() {
     $status_file = $user_dir . '/status.json';
 
     $cmd = sprintf(
-        '%s %s --text %s --voice %s --stability %s --output %s --status_file %s',
+        '%s %s --text %s --voice %s --stability %s --max_words %s --pause_time %s --output %s --status_file %s',
         escapeshellarg( $python_path ), escapeshellarg( $script_path ),
         escapeshellarg( $text ), escapeshellarg( $voice ),
-        escapeshellarg( $stability ), escapeshellarg( $output_path ),
-        escapeshellarg( $status_file )
+        escapeshellarg( $stability ), escapeshellarg( $max_words ), escapeshellarg( $pause_time ),
+        escapeshellarg( $output_path ), escapeshellarg( $status_file )
     );
 
     file_put_contents( $status_file, json_encode( array( 
@@ -185,13 +186,14 @@ function voiceqwen_generate_dialogue() {
 
     $text = sanitize_textarea_field( $_POST['text'] );
     $stability = isset( $_POST['stability'] ) ? floatval( $_POST['stability'] ) : 0.7;
+    $max_words = isset( $_POST['max_words'] ) ? intval( $_POST['max_words'] ) : 30;
+    $pause_time = isset( $_POST['pause_time'] ) ? floatval( $_POST['pause_time'] ) : 0.5;
     if ( empty( $text ) ) wp_send_json_error( 'El texto está vacío.' );
 
     $text_clean = str_replace("\n", " ", $text);
     $sentences = preg_split('/(?<=[.!?])\s+/', $text_clean, -1, PREG_SPLIT_NO_EMPTY);
     $total_frags = 1;
     if (!empty($sentences)) {
-        $max_words = 15;
         $current_chunk_words = 0;
         $frag_count = 0;
         foreach ($sentences as $s) {
@@ -240,9 +242,10 @@ function voiceqwen_generate_dialogue() {
     ) ) );
 
     $cmd = sprintf(
-        '%s %s --text %s --stability %s --output %s --status_file %s',
+        '%s %s --text %s --stability %s --max_words %s --pause_time %s --output %s --status_file %s',
         escapeshellarg( $python_path ), escapeshellarg( $script_path ),
         escapeshellarg( $text ), escapeshellarg( $stability ),
+        escapeshellarg( $max_words ), escapeshellarg( $pause_time ),
         escapeshellarg( $output_path ), escapeshellarg( $status_file )
     );
 

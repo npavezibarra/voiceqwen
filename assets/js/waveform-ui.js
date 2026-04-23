@@ -1,34 +1,56 @@
 window.VoiceQwen = window.VoiceQwen || {};
 
 jQuery(document).ready(function ($) {
-    let wavesurfer = null, wsRegions = null, activeFileName = '', activeFileUrl = '', currentWaveUrl = '';
+    let wavesurfer = null, wsRegions = null, activeFileName = '', activeFileRelPath = '', activeFileUrl = '', currentWaveUrl = '';
     let isDraggingMini = false, dragStartX, dragStartY, modalStartX, modalStartY;
     let autoSaveTimer = null, lastInsertTime = 0;
+    let sessionTempClips = [];
+    let lastPointer = { pageX: 0, pageY: 0, clientX: 0, clientY: 0 };
+    let activeRegion = null;
 
     window.VoiceQwen.loadWaveform = loadWaveform;
     window.VoiceQwen.handleInsertion = handleInsertion;
 
     function getAudioCtx() { return window.VoiceQwen.getAudioCtx(); }
 
-    async function loadWaveform(url, filename, hasBackup = false, hasAutosave = false, autosaveUrl = '') {
+    function withCacheBuster(url, key = 't') {
+        try {
+            const u = new URL(url, window.location.href);
+            u.searchParams.set(key, String(Date.now()));
+            return u.toString();
+        } catch (_) {
+            const join = url.includes('?') ? '&' : '?';
+            return url + join + key + '=' + Date.now();
+        }
+    }
+
+    async function loadWaveform(url, filename, hasBackup = false, hasAutosave = false, autosaveUrl = '', relPath = '') {
         if (window.VoiceQwen.isLoadingWaveform) return;
         window.VoiceQwen.isLoadingWaveform = true;
 
         if (hasAutosave && autosaveUrl && confirm("¿Recuperar cambios automáticos?")) url = autosaveUrl;
 
-        activeFileName = filename; activeFileUrl = url;
+        activeFileName = filename;
+        activeFileRelPath = relPath || filename;
+        activeFileUrl = url;
+        sessionTempClips = [];
         $('#wave-viewer-empty, #wave-viewer-container').addClass('hidden');
         $('#wave-viewer-loading').removeClass('hidden');
         $('#waveform-title').text(filename);
+        // Timeline needs real layout width at init time. Keep the container in the flow but hidden.
+        $('#wave-viewer-container').removeClass('hidden').css({ visibility: 'hidden' });
+        $('#waveform').empty();
+        $('#wave-timeline').empty();
 
         try {
             const ctx = getAudioCtx();
-            const response = await fetch(url);
+            const response = await fetch(withCacheBuster(url), { cache: 'no-store' });
             const arrayBuffer = await response.arrayBuffer();
             window.VoiceQwen.activeAudioBuffer = await ctx.decodeAudioData(arrayBuffer);
         } catch (e) {
             window.VoiceQwen.isLoadingWaveform = false;
             alert("Error cargando audio: " + e.message);
+            $('#wave-viewer-container').addClass('hidden').css({ visibility: '' });
             return;
         }
 
@@ -36,17 +58,50 @@ jQuery(document).ready(function ($) {
         wsRegions = WaveSurfer.Regions.create();
         wavesurfer = WaveSurfer.create({
             container: '#waveform', waveColor: '#00ffff', progressColor: '#ff00ff', height: 150,
-            plugins: [wsRegions, WaveSurfer.Timeline.create({ container: '#wave-timeline' })]
+            plugins: [
+                wsRegions, 
+                WaveSurfer.Timeline.create({ 
+                    container: '#wave-timeline',
+                    height: 20,
+                    timeInterval: (pxPerSec) => {
+                        if (pxPerSec >= 200) return 0.1;
+                        if (pxPerSec >= 50) return 0.5;
+                        if (pxPerSec >= 20) return 1;
+                        return 5;
+                    },
+                    primaryLabelInterval: (pxPerSec) => {
+                        if (pxPerSec >= 200) return 1;
+                        if (pxPerSec >= 50) return 2.5;
+                        if (pxPerSec >= 20) return 5;
+                        return 10;
+                    },
+                    style: { fontSize: '10px', color: '#888' }
+                })
+            ]
         });
+        window.VoiceQwen.wavesurferInstance = wavesurfer;
 
         wsRegions.enableDragSelection({ color: 'rgba(255, 0, 255, 0.2)' });
+        
+        // Enforce single region logic
+        wsRegions.on('region-created', (region) => {
+            activeRegion = region;
+            showSegmentMenuAt(lastPointer.pageX || 0, lastPointer.pageY || 0);
+            wsRegions.getRegions().forEach(r => {
+                if (r !== region) r.remove();
+            });
+        });
+
         wsRegions.on('region-updated', (region) => {
+            activeRegion = region;
+            showSegmentMenuAt(lastPointer.pageX || 0, lastPointer.pageY || 0);
             $('#wave-region-delete').removeClass('hidden').off('click').on('click', () => {
                 const newBuf = window.VoiceQwen.deleteSegment(window.VoiceQwen.activeAudioBuffer, region.start, region.end);
                 if (newBuf) {
                     window.VoiceQwen.waveUndoStack.push(window.VoiceQwen.activeAudioBuffer);
                     window.VoiceQwen.activeAudioBuffer = newBuf;
                     updateWaveformPreview();
+                    $('#wave-region-delete').addClass('hidden');
                 }
             });
         });
@@ -54,36 +109,71 @@ jQuery(document).ready(function ($) {
         wavesurfer.on('ready', () => {
             window.VoiceQwen.isLoadingWaveform = false;
             $('#wave-viewer-loading').addClass('hidden');
-            $('#wave-viewer-container').removeClass('hidden');
+            $('#wave-viewer-container').removeClass('hidden').css({ visibility: '' });
+            // Force a redraw so the Timeline renders tick labels after becoming visible.
+            setTimeout(() => {
+                if (!wavesurfer) return;
+                const z = Number($('#wave-zoom').val() || 10);
+                wavesurfer.zoom(z);
+            }, 0);
+            $(document).trigger('voiceqwen_waveform_ready');
         });
 
-        wavesurfer.load(url);
+        wavesurfer.on('click', () => {
+            wsRegions.clearRegions();
+            $('#wave-region-delete').addClass('hidden');
+            activeRegion = null;
+            hideSegmentMenu();
+        });
+
+        // Also bust cache for WaveSurfer internal fetch.
+        wavesurfer.load(withCacheBuster(url));
     }
 
     function updateWaveformPreview() {
         const blob = window.VoiceQwen.audioBufferToWav(window.VoiceQwen.activeAudioBuffer);
         currentWaveUrl = URL.createObjectURL(blob);
+        if (wsRegions) wsRegions.clearRegions();
         wavesurfer.load(currentWaveUrl);
         $('#wave-save, #wave-undo').removeClass('hidden');
         requestAutoSave();
     }
 
-    $(document).on('contextmenu', '#waveform', function(e) {
-        e.preventDefault();
+    function ensureSegmentMenu() {
+        if (document.getElementById('wave-segment-menu')) return;
+        const el = document.createElement('div');
+        el.id = 'wave-segment-menu';
+        el.className = 'vq-segment-menu hidden';
+        el.innerHTML = `
+            <button type="button" class="vq-seg-btn" data-action="delete">DELETE</button>
+            <button type="button" class="vq-seg-btn" data-action="voice">VOICE</button>
+        `;
+        document.body.appendChild(el);
+    }
+
+    function hideSegmentMenu() {
+        const el = document.getElementById('wave-segment-menu');
+        if (el) el.classList.add('hidden');
+    }
+
+    function showSegmentMenuAt(pageX, pageY) {
+        ensureSegmentMenu();
+        const el = document.getElementById('wave-segment-menu');
+        if (!el) return;
+        el.style.left = `${pageX}px`;
+        el.style.top = `${pageY}px`;
+        el.classList.remove('hidden');
+    }
+
+    function openAddSpeechAt(timeSeconds, pageX, pageY) {
         if (!wavesurfer) return;
-        
-        const wrapper = wavesurfer.getWrapper();
-        const rect = wrapper.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        const duration = wavesurfer.getDuration();
-        
-        // Accurate time calculation regardless of zoom
-        lastInsertTime = (x / rect.width) * duration;
-        
-        console.log("Waveform: Context menu at time", lastInsertTime);
-        $('#wave-mini-modal').removeClass('hidden').css({ left: e.pageX + 'px', top: e.pageY + 'px' });
-        
-        // Populate mini-voices if empty
+        const duration = wavesurfer.getDuration() || 0;
+        if (!duration) return;
+        lastInsertTime = Math.max(0, Math.min(duration, Number(timeSeconds) || 0));
+
+        const $modal = $('#wave-mini-modal');
+        $modal.removeClass('hidden').css({ left: `${pageX}px`, top: `${pageY}px` });
+
         const $miniSelector = $('#mini-voice-selector');
         if ($miniSelector.children().length === 0) {
             $.post(voiceqwen_ajax.url, { action: 'voiceqwen_get_voices', nonce: voiceqwen_ajax.nonce }, function(res) {
@@ -101,11 +191,86 @@ jQuery(document).ready(function ($) {
                 }
             });
         }
+    }
+
+    function openAddSpeechModal(nativeEvent) {
+        if (!wavesurfer) return;
+
+        const wrapper = wavesurfer.getWrapper();
+        const rect = wrapper.getBoundingClientRect();
+        const x = nativeEvent.clientX - rect.left;
+        const duration = wavesurfer.getDuration() || 0;
+        if (!duration || rect.width <= 0) return;
+
+        // Accurate time calculation regardless of zoom.
+        const t = (x / rect.width) * duration;
+        console.log("Waveform: Context menu at time", t);
+        openAddSpeechAt(t, nativeEvent.pageX, nativeEvent.pageY);
+    }
+
+    // Primary handler (bubble) for normal cases.
+    $(document).on('contextmenu', '#waveform', function(e) {
+        e.preventDefault();
+        openAddSpeechModal(e.originalEvent || e);
     });
 
+    // Fallback handler (capture) in case a library stops propagation on internal nodes.
+    // This fixes cases where right-click happens on internal WaveSurfer layers and our jQuery handler never sees it.
+    document.addEventListener('contextmenu', function(ev) {
+        try {
+            const wf = document.getElementById('waveform');
+            if (!wf) return;
+            if (!wavesurfer) return;
+            if (!wf.contains(ev.target)) return;
+            ev.preventDefault();
+            ev.stopPropagation();
+            openAddSpeechModal(ev);
+        } catch (_) {}
+    }, true);
+
+    // Track last pointer position inside the waveform, so region selection can spawn a small submenu under the cursor.
+    $(document).on('mousedown touchstart mouseup touchend', '#waveform', function(e) {
+        const oe = e.originalEvent && e.originalEvent.touches ? e.originalEvent.touches[0] : (e.originalEvent || e);
+        if (!oe) return;
+        lastPointer = { pageX: oe.pageX || 0, pageY: oe.pageY || 0, clientX: oe.clientX || 0, clientY: oe.clientY || 0 };
+    });
+
+    // Segment submenu actions (DELETE / VOICE)
+    $(document).on('click', '#wave-segment-menu .vq-seg-btn', function(e) {
+        e.preventDefault();
+        const action = $(this).data('action');
+        if (!activeRegion || !window.VoiceQwen || !window.VoiceQwen.activeAudioBuffer) return;
+
+        if (action === 'delete') {
+            const newBuf = window.VoiceQwen.deleteSegment(window.VoiceQwen.activeAudioBuffer, activeRegion.start, activeRegion.end);
+            if (newBuf) {
+                window.VoiceQwen.waveUndoStack.push(window.VoiceQwen.activeAudioBuffer);
+                window.VoiceQwen.activeAudioBuffer = newBuf;
+                updateWaveformPreview();
+                hideSegmentMenu();
+            }
+        } else if (action === 'voice') {
+            hideSegmentMenu();
+            openAddSpeechAt(activeRegion.start, lastPointer.pageX || 0, lastPointer.pageY || 0);
+        }
+    });
+
+    // Hide submenu when clicking elsewhere.
+    $(document).on('mousedown', function(e) {
+        const menu = document.getElementById('wave-segment-menu');
+        if (!menu || menu.classList.contains('hidden')) return;
+        if (menu.contains(e.target)) return;
+        hideSegmentMenu();
+    });
+
+    // Zoom interactions are handled by waveform-ruler-controls.js to keep files small.
     $(document).on('input', '#wave-zoom', function() {
         if (wavesurfer) wavesurfer.zoom(Number($(this).val()));
     });
+
+    $(document).on('input', '#mini-stability', function() { $('#mini-stability-val').text($(this).val()); });
+    $(document).on('input', '#mini-max-words', function() { $('#mini-max-words-val').text($(this).val()); });
+    $(document).on('input', '#mini-pause-time', function() { $('#mini-pause-time-val').text($(this).val()); });
 
     $(document).on('click', '#mini-generate-btn', async function() {
         const text = $('#mini-text').val();
@@ -116,6 +281,9 @@ jQuery(document).ready(function ($) {
         formData.append('nonce', voiceqwen_ajax.nonce);
         formData.append('voice', $('input[name="mini-voice"]:checked').val());
         formData.append('text', text);
+        formData.append('stability', $('#mini-stability').val());
+        formData.append('max_words', $('#mini-max-words').val());
+        formData.append('pause_time', $('#mini-pause-time').val());
         formData.append('source', 'mini');
         
         if (typeof window.VoiceQwen.getPath === 'function') {
@@ -137,8 +305,16 @@ jQuery(document).ready(function ($) {
     async function handleInsertion(url) {
         try {
             console.log("Waveform: Loading insertion buffer from", url);
+            try {
+                const u = new URL(url, window.location.href);
+                const clipName = decodeURIComponent(u.pathname.split('/').pop() || '');
+                if (clipName && clipName.toLowerCase().startsWith('clip')) {
+                    if (!sessionTempClips.includes(clipName)) sessionTempClips.push(clipName);
+                }
+            } catch (_) {}
+
             const ctx = getAudioCtx();
-            const res = await fetch(url + '?t=' + Date.now());
+            const res = await fetch(withCacheBuster(url), { cache: 'no-store' });
             const arrayBuf = await res.arrayBuffer();
             const buf = await ctx.decodeAudioData(arrayBuf);
             
@@ -178,13 +354,16 @@ jQuery(document).ready(function ($) {
             fd.append('action', 'voiceqwen_save_edited_audio');
             fd.append('nonce', voiceqwen_ajax.nonce);
             fd.append('filename', activeFileName);
+            fd.append('rel_path', activeFileRelPath || activeFileName);
+            if (sessionTempClips.length) fd.append('cleanup_files', JSON.stringify(sessionTempClips));
             fd.append('audio', blob, activeFileName);
 
             $.ajax({ url: voiceqwen_ajax.url, type: 'POST', data: fd, processData: false, contentType: false, success: (res) => {
                 if (res.success) { 
                     alert("¡Cambios guardados con éxito!"); 
                     $btn.addClass('hidden'); 
-                    deleteAutosave(activeFileName); 
+                    sessionTempClips = [];
+                    deleteAutosave(activeFileName, activeFileRelPath); 
                 } else {
                     alert("Error: " + res.data);
                 }
@@ -212,13 +391,19 @@ jQuery(document).ready(function ($) {
             fd.append('action', 'voiceqwen_save_autosave');
             fd.append('nonce', voiceqwen_ajax.nonce);
             fd.append('filename', activeFileName);
+            fd.append('rel_path', activeFileRelPath || activeFileName);
             fd.append('audio', blob, activeFileName + '-autosave.wav');
             $.ajax({ url: voiceqwen_ajax.url, type: 'POST', data: fd, processData: false, contentType: false });
         } catch(e) {}
     }
 
-    function deleteAutosave(filename) {
-        $.post(voiceqwen_ajax.url, { action: 'voiceqwen_delete_autosave', nonce: voiceqwen_ajax.nonce, filename: filename });
+    function deleteAutosave(filename, relPath = '') {
+        $.post(voiceqwen_ajax.url, {
+            action: 'voiceqwen_delete_autosave',
+            nonce: voiceqwen_ajax.nonce,
+            filename: filename,
+            rel_path: relPath || filename
+        });
     }
 
     $(document).on('click', '#mini-modal-close', () => $('#wave-mini-modal').addClass('hidden'));
@@ -252,5 +437,46 @@ jQuery(document).ready(function ($) {
             isDraggingMini = false;
             $('#wave-mini-modal').css('cursor', '');
         }
+    });
+    // Custom Resize Logic for Mini Modal
+    let isResizingRight = false, isResizingBottom = false, isResizingBoth = false;
+    let startWidth, startHeight, resizeStartX, resizeStartY;
+
+    $(document).on('mousedown', '.resize-handle-e', function(e) {
+        isResizingRight = true;
+        startWidth = $('#wave-mini-modal').outerWidth();
+        resizeStartX = e.pageX;
+        e.preventDefault();
+    });
+
+    $(document).on('mousedown', '.resize-handle-s', function(e) {
+        isResizingBottom = true;
+        startHeight = $('#wave-mini-modal').outerHeight();
+        resizeStartY = e.pageY;
+        e.preventDefault();
+    });
+
+    $(document).on('mousedown', '.resize-handle-se', function(e) {
+        isResizingBoth = true;
+        startWidth = $('#wave-mini-modal').outerWidth();
+        startHeight = $('#wave-mini-modal').outerHeight();
+        resizeStartX = e.pageX;
+        resizeStartY = e.pageY;
+        e.preventDefault();
+    });
+
+    $(document).on('mousemove', function(e) {
+        if (isResizingRight || isResizingBoth) {
+            $('#wave-mini-modal').css('width', Math.max(340, startWidth + (e.pageX - resizeStartX)) + 'px');
+        }
+        if (isResizingBottom || isResizingBoth) {
+            $('#wave-mini-modal').css('height', Math.max(350, startHeight + (e.pageY - resizeStartY)) + 'px');
+        }
+    });
+
+    $(document).on('mouseup', function() {
+        isResizingRight = false;
+        isResizingBottom = false;
+        isResizingBoth = false;
     });
 });
