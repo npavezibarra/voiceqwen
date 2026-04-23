@@ -1,95 +1,209 @@
-# VoiceQwen (Plugin WordPress)
+# VoiceQwen
 
-`voiceqwen` (UI: **LOCUTOR**) es un plugin de WordPress orientado a crear audio con voces (TTS), generar diálogos multi‑voz, editar audio con un editor de waveform y administrar proyectos tipo “audiobook” (capítulos/playlist), con opción de almacenar en local o Cloudflare R2.
+`voiceqwen` (UI: `LOCUTOR`) es un plugin de WordPress para generar audio TTS, construir dialogos multi-voz, editar audio en un waveform editor y organizar proyectos tipo audiobook con capitulos, playlist y almacenamiento local o Cloudflare R2.
 
-> Carpeta del plugin: `wp-content/plugins/voiceqwen/`
+Carpeta del plugin: `wp-content/plugins/voiceqwen/`
 
 ## Funcionalidades
 
-- **CREATE AUDIO (TTS)**: genera `.wav` desde texto o desde archivo `.txt`, con controles de estabilidad, segmentación (máx palabras por segmento) y pausa entre segmentos.
-- **DIALOGUES (multi‑voz)**: genera un `.wav` usando texto etiquetado por personaje, con el formato `[Nombre]...[/Nombre]`.
-- **WAVE VIEWER / Editor**: visualiza waveform (WaveSurfer), permite selección por región, borrar selección, undo, restaurar original y guardar ediciones. Incluye auto‑save.
-- **File Manager**: explorador de archivos por usuario (en `wp_upload_dir()`), con creación de carpetas, mover, renombrar, ordenar (persistencia `.order.json`), upload de `.wav` y borrado.
-- **UPLOAD VOICE**: UI/formulario para registrar una nueva voz (muestra `.wav`, transcripción, avatar). Nota: el backend de entrenamiento/registro puede requerir implementación adicional según tu pipeline.
-- **AUDIOBOOK MANAGER**: crea audiobooks (CPT `audiobook`), administra playlist de capítulos, reordena con SortableJS, sube capítulos y portada, reproduce inline, y permite sincronizar capítulos locales a Cloudflare R2.
-- **AUDIO QUALITY REPORT**: análisis de calidad (peak/RMS + resumen) sobre los `.wav` del usuario.
-- **CONFIG**: configuración de almacenamiento (local/R2) y test de conexión a R2.
+- `CREATE AUDIO`: genera `.wav` desde texto o `.txt`, con controles de estabilidad, maximo de palabras por segmento y pausa entre segmentos.
+- `DIALOGUES`: genera audio multi-voz desde texto etiquetado con formato `[Nombre]...[/Nombre]`.
+- `WAVE VIEWER / WAVEFORM EDITOR`: editor visual sobre WaveSurfer para revisar, cortar, insertar voz, reproducir, deshacer, restaurar y guardar.
+- `FILE MANAGER`: explorador de archivos por usuario con carpetas, mover, renombrar, ordenar, upload de `.wav` y borrado.
+- `UPLOAD VOICE`: interfaz para registrar nuevas voces con muestra, transcripcion y avatar.
+- `AUDIOBOOK`: administra audiobooks, capitulos, playlist, uploads, reproduccion inline y sincronizacion local/R2.
+- `AUDIO QUALITY REPORT`: analisis basico de calidad de audio.
+- `CONFIG`: configuracion de storage y test de conexion a R2.
 
-## Cómo se integra en WordPress
+## Editor de Waveform
 
-- El plugin asegura la existencia de páginas:
-  - `voice` (título: `LOCUTOR`) que renderiza el shortcode `[voiceqwen_ui]`.
-  - `audi` (título: `Audi`) que usa un template propio.
-- El UI principal se renderiza vía shortcode `voiceqwen_ui()` en `voiceqwen.php`.
-- El plugin encola assets (CSS/JS) y librerías externas:
-  - WaveSurfer + plugins (regions/timeline)
-  - SortableJS
-- La comunicación front/back se hace con `admin-ajax.php` usando `nonce` (`voiceqwen_nonce`) y requiere usuario autenticado para las acciones sensibles.
+El editor de waveform es una de las piezas centrales del plugin. Hoy soporta:
 
-## Arquitectura (Modular y por dominio)
+- Visualizacion del waveform con `WaveSurfer`.
+- Seleccion por region.
+- Menu contextual sobre una region seleccionada con acciones `DELETE` y `VOICE`.
+- Menu contextual sobre un punto del waveform con acciones `VOICE` y `MARKER`.
+- Insercion de voz nueva en un punto exacto usando el panel `ADD SPEECH`.
+- Borrado de segmentos seleccionados.
+- `UNDO (-1)`.
+- `RESTORE ORIGINAL`.
+- `SAVE EDITS`.
+- Auto-save mientras se trabaja.
+- Timeline inferior con segundos visibles.
+- Timeline que se adapta al `zoom`.
+- Timeline que sigue el `horizontal scroll`.
+- `Spacebar` como toggle `PLAY / PAUSE`.
+- Zoom por slider y soporte de gesto/scroll horizontal segun el viewer actual.
 
-El objetivo es que el plugin sea fácil de evolucionar (y fácil de mantener con agentes) separando UI, lógica, endpoints y plantillas.
+## ADD SPEECH
 
-### 1. Entrada principal (`/`)
+El panel `ADD SPEECH` se abre desde el editor en dos casos:
 
-- `voiceqwen.php`: entry point. Carga subsistemas, registra templates, encola assets, define el shortcode y asegura páginas.
-- `tts_cli.py`: backend Python para generación TTS single‑voice.
-- `tts_dialogue.py`: backend Python para generación multi‑voz (diálogos).
+- `Right click` sobre un punto del waveform y luego `VOICE`.
+- Seleccion de una region y luego `VOICE`.
 
-### 2. Endpoints AJAX (`/includes/`)
+El panel permite:
 
-- `ajax-generation.php`: generación TTS/diálogos en segundo plano (`nohup`), tracking vía `status.json`, reset/cancel.
-- `ajax-files.php`: árbol de archivos, mover, renombrar, crear carpetas, upload `.wav`, eliminar, orden persistente.
-- `ajax-editor.php`: guardar ediciones del editor (backup `.original.wav`), restore original, autosave y limpieza.
-- `ajax-meta.php`: voces disponibles (desde `assets/voices`), avatar custom, audio analysis.
-- `file-helpers.php`: utilidades de filesystem (tree, deletes, etc.).
-- `class-voiceqwen-audio-analyzer.php`: lógica del reporte de calidad (QC).
+- Elegir voz.
+- Escribir el texto a insertar.
+- Generar un clip nuevo.
+- Insertarlo en la posicion activa del waveform.
 
-### 3. UI / Templates (`/templates/`)
+Valores default del panel:
 
-- `templates/voice-template.php`: template para la página `voice`.
-- `templates/audi-template.php`: template para la página `audi`.
-- `templates/views/`: vistas parciales del UI principal (create/dialogues/waveform/audiobook/upload/config/sidebar/mini‑modal).
+- `Estabilidad`: `0.5`
+- `Palabras/segm`: `40`
+- `Pausa`: `0.1`
 
-### 4. Frontend (`/assets/`)
+## Guardado de ediciones
 
-- `assets/js/`: routing de vistas, generación/polling, file manager, waveform UI + lógica, avatar manager.
-- `assets/css/`: base + theme + estilos específicos (waveform/audiobook).
-- `assets/voices/`: definiciones de voces (referencias), usadas para listar voces disponibles.
+El flujo esperado del editor es:
 
-### 5. Módulos (`/modules/`)
+- El usuario abre un audio original.
+- El editor permite borrar segmentos o insertar clips nuevos generados desde texto.
+- Al guardar, se debe sobrescribir el audio correcto en la ubicacion correcta del proyecto.
+- El sistema crea un backup original una sola vez.
+- El sistema mantiene auto-save mientras el usuario trabaja.
 
-- `modules/audiobook/`: módulo aislado con CPT, settings, manager UI, integración con R2.
+Archivos relacionados:
+
+- Backup original: `<archivo>.original.wav`
+- Auto-save: `<archivo>-autosave.wav`
+
+## Markers
+
+Se implemento un mecanismo de `markers` para dejar puntos de referencia dentro del audio y volver mas tarde a trabajar sobre ellos.
+
+### Que hace un marker
+
+- Se agrega sobre un punto exacto del waveform.
+- Se dibuja como una linea vertical con un handle visible arriba.
+- Puede tener nombre opcional.
+- Debe persistir entre sesiones para el mismo audio.
+- Puede seleccionarse.
+- Puede moverse horizontalmente.
+- Puede eliminarse.
+
+### Como se usa
+
+- `Right click` sobre un punto del waveform.
+- Elegir `MARKER`.
+- El marker aparece en esa posicion del audio.
+- `Click` sobre el handle superior para seleccionarlo.
+- Arrastre horizontal del handle para moverlo.
+- `Right click` sobre el marker para eliminarlo.
+- Tambien puede borrarse con tecla `Delete` / `Backspace` cuando esta seleccionado.
+
+### Persistencia de markers
+
+Los markers no se guardan en base de datos. Se guardan como JSON al lado del `.wav` correspondiente, dentro del storage del usuario:
+
+- `wp_upload_dir()['basedir']/voiceqwen/<username>/<ruta_relativa>.wav.markers.json`
+
+Endpoint relacionado:
+
+- `includes/ajax-markers.php`
+
+Frontend relacionado:
+
+- `assets/js/waveform-markers.js`
+
+## Integracion con WordPress
+
+El plugin asegura la existencia de paginas:
+
+- `voice`: renderiza el shortcode `[voiceqwen_ui]`
+- `audi`: usa template propio para la experiencia audiobook
+
+La UI principal se monta desde `voiceqwen.php` y encola:
+
+- `WaveSurfer`
+- plugin de regiones
+- plugin de timeline
+- `SortableJS`
+
+La comunicacion front/back se hace por `admin-ajax.php` con `nonce` `voiceqwen_nonce`.
+
+## Arquitectura
+
+La estructura actual busca mantener dominios separados para que el plugin sea mas mantenible y mas facil de extender con agentes.
+
+### Root
+
+- `voiceqwen.php`: entry point del plugin, shortcode, assets, bootstrap general.
+- `tts_cli.py`: generacion TTS single-voice.
+- `tts_dialogue.py`: generacion TTS multi-voz.
+
+### Includes
+
+- `includes/ajax-generation.php`: generacion en background y polling de estado.
+- `includes/ajax-files.php`: file manager, arbol, mover, renombrar, uploads y orden.
+- `includes/ajax-editor.php`: save edits, restore original, autosave y limpieza.
+- `includes/ajax-markers.php`: get/save de markers por archivo.
+- `includes/ajax-meta.php`: voces, avatars, analisis de audio.
+- `includes/file-helpers.php`: helpers de filesystem.
+- `includes/class-voiceqwen-audio-analyzer.php`: analisis de calidad.
+
+### Frontend JS
+
+- `assets/js/core.js`: estado general y wiring base.
+- `assets/js/generation.js`: generacion y polling.
+- `assets/js/file-manager.js`: explorador de archivos.
+- `assets/js/avatar-manager.js`: gestion de avatars/voces.
+- `assets/js/waveform-ui.js`: carga del waveform, seleccion, modales, acciones del editor.
+- `assets/js/waveform-logic.js`: operaciones de audio sobre `AudioBuffer`.
+- `assets/js/waveform-ruler-controls.js`: timeline, zoom, scroll sync, keyboard shortcuts.
+- `assets/js/waveform-markers.js`: markers, persistencia y drag/delete/select.
+
+### Templates
+
+- `templates/voice-template.php`
+- `templates/audi-template.php`
+- `templates/views/`: vistas parciales del UI
+
+### Styles
+
+- `assets/css/base.css`
+- `assets/css/theme-vaporwave.css`
+- `assets/css/waveform-viewer.css`
+- `assets/css/audiobook.css`
 
 ## Datos y almacenamiento
 
-- Por usuario, los archivos se guardan bajo: `wp_upload_dir()['basedir']/voiceqwen/<username>/`.
-- El estado de trabajos en background se guarda en `status.json` en la carpeta del usuario.
-- Ediciones crean backup una sola vez: `<archivo>.original.wav`.
-- Auto‑save: `<archivo>-autosave.wav`.
-- Audiobooks:
-  - Metadatos en el CPT `audiobook` (playlist, author, cover key, folder name).
-  - `local` usa `wp_upload_dir()` y `r2` usa Cloudflare R2 vía `aws/aws-sdk-php`.
+- Base de storage por usuario: `wp_upload_dir()['basedir']/voiceqwen/<username>/`
+- Estado de jobs en background: `status.json`
+- Orden persistente del file manager: `.order.json`
+- Backups originales del editor: `<archivo>.original.wav`
+- Auto-save del editor: `<archivo>-autosave.wav`
+- Markers: `<archivo>.wav.markers.json`
+
+Audiobooks:
+
+- Metadatos principales en el CPT `audiobook`
+- Playlist y metadata asociada al proyecto
+- Soporte para local y Cloudflare R2
 
 ## Dependencias
 
-- PHP: usa Composer (`composer.json`) para `aws/aws-sdk-php` (R2).
-- JS: WaveSurfer y SortableJS via CDN (ver `voiceqwen_enqueue_assets()` en `voiceqwen.php`).
-- Python: `tts_cli.py` y `tts_dialogue.py` se ejecutan en background. Actualmente se intenta usar un Python de venv específico y, si no existe, cae a `python3`.
+- PHP Composer: `aws/aws-sdk-php`
+- JS CDN: `WaveSurfer`, plugins de regiones/timeline, `SortableJS`
+- Python: `tts_cli.py` y `tts_dialogue.py`
 
-## Reglas de desarrollo (Obligatorio)
+## Reglas de desarrollo
 
-Lee y respeta `AGENTS.md` antes de cambiar código.
+Leer y respetar `AGENTS.md` antes de cambiar codigo.
 
-Regla clave para mantener el plugin ágil (especialmente al programar con agentes):
+Regla obligatoria para mantener el plugin agil:
 
-- **No habrá archivos grandes**: ningún archivo de código debe superar ~**500 líneas**.
-- **Si un archivo se acerca a ~500 líneas o empieza a mezclar dominios**, se debe **crear otro archivo** y **encapsular** funciones/clases de forma lógica (por responsabilidad).
-- **Una responsabilidad por archivo**: separa UI, lógica pura, endpoints, helpers, templates, etc.
-- **Mantener la estructura modular**: no volver a diseños monolíticos (por ejemplo, “todo en un solo `script.js`”).
+- Ningun archivo de codigo debe crecer mas alla de aproximadamente `500` lineas.
+- Si un archivo se acerca a ese tamano, se debe dividir.
+- Las funciones deben encapsularse por responsabilidad.
+- No mezclar UI, logica pura, endpoints y helpers en un mismo archivo si ya pertenecen a dominios distintos.
+- Mantener la estructura modular del plugin.
 
-## Tips rápidos (para agentes)
+## Notas para agentes
 
-- Añade features creando archivos nuevos por dominio en `includes/` o `assets/js/` antes de “seguir engordando” un archivo existente.
-- Mantén funciones pequeñas y con nombres explícitos; cuando un endpoint crezca, divide por `ajax-<dominio>.php`.
-- Evita acoplar el JS a HTML suelto: la UI vive en `templates/views/` y la lógica en `assets/js/`.
+- Antes de agregar mas logica a un archivo JS o PHP grande, revisar si corresponde crear un archivo nuevo.
+- Las features del editor deben repartirse entre `waveform-ui.js`, `waveform-logic.js`, `waveform-ruler-controls.js` y `waveform-markers.js`.
+- Los endpoints AJAX deben seguir separados por dominio.
+- Los markers son parte del estado de edicion del audio, pero su persistencia es archivo JSON, no tabla SQL.

@@ -289,32 +289,50 @@
 
         <!-- View: Audiobook -->
         <div id="view-audio-manager" class="view-container active">
-            <?php 
-            if (function_exists('voiceqwen_audiobook_render_ui')) {
-                voiceqwen_audiobook_render_ui(); 
-            }
-            ?>
+            <?php if ( is_user_logged_in() ) : ?>
+                <?php 
+                if (function_exists('voiceqwen_audiobook_render_ui')) {
+                    voiceqwen_audiobook_render_ui(); 
+                }
+                ?>
+            <?php else : ?>
+                <div class="finder-window" style="height:auto; min-height:320px; justify-content:center; align-items:center; color:#333; text-align:center; padding:40px;">
+                    <div>
+                        <h2 style="color:#000; margin-bottom:12px;">Login Required</h2>
+                        <p style="color:#666; max-width:520px; margin:0 auto;">Debes iniciar sesion para usar Audiobook Manager y el editor de archivos/audio.</p>
+                    </div>
+                </div>
+            <?php endif; ?>
         </div>
 
         <!-- View: Files (Finder) -->
         <div id="view-finder" class="view-container">
-            <div class="finder-window">
-                <div class="finder-toolbar">
-                    <div class="finder-traffic-lights">
-                        <span class="light red"></span>
-                        <span class="light yellow"></span>
-                        <span class="light green"></span>
+            <?php if ( is_user_logged_in() ) : ?>
+                <div class="finder-window">
+                    <div class="finder-toolbar">
+                        <div class="finder-traffic-lights">
+                            <span class="light red"></span>
+                            <span class="light yellow"></span>
+                            <span class="light green"></span>
+                        </div>
+                        <div class="finder-nav-controls">
+                            <span>〈</span>
+                            <span>〉</span>
+                        </div>
+                        <div class="finder-title" id="finder-current-path">ROOT / UPLOADS</div>
                     </div>
-                    <div class="finder-nav-controls">
-                        <span>〈</span>
-                        <span>〉</span>
+                    <div class="finder-columns-container" id="finder-columns">
+                        <!-- Columns injected here -->
                     </div>
-                    <div class="finder-title" id="finder-current-path">ROOT / UPLOADS</div>
                 </div>
-                <div class="finder-columns-container" id="finder-columns">
-                    <!-- Columns injected here -->
+            <?php else : ?>
+                <div class="finder-window" style="height:auto; min-height:320px; justify-content:center; align-items:center; color:#333; text-align:center; padding:40px;">
+                    <div>
+                        <h2 style="color:#000; margin-bottom:12px;">Login Required</h2>
+                        <p style="color:#666; max-width:520px; margin:0 auto;">Debes iniciar sesion para explorar archivos o editar audiobooks.</p>
+                    </div>
                 </div>
-            </div>
+            <?php endif; ?>
         </div>
 
         <!-- View: Waveform Editor (Shared) -->

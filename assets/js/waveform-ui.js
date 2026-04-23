@@ -7,6 +7,7 @@ jQuery(document).ready(function ($) {
     let sessionTempClips = [];
     let lastPointer = { clientX: 0, clientY: 0 };
     let activeRegion = null;
+    let pendingReplaceRange = null;
 
     window.VoiceQwen.loadWaveform = loadWaveform;
     window.VoiceQwen.handleInsertion = handleInsertion;
@@ -125,6 +126,7 @@ jQuery(document).ready(function ($) {
             wsRegions.clearRegions();
             $('#wave-region-delete').addClass('hidden');
             activeRegion = null;
+            pendingReplaceRange = null;
             hideSegmentMenu();
         });
 
@@ -136,6 +138,8 @@ jQuery(document).ready(function ($) {
         const blob = window.VoiceQwen.audioBufferToWav(window.VoiceQwen.activeAudioBuffer);
         currentWaveUrl = URL.createObjectURL(blob);
         if (wsRegions) wsRegions.clearRegions();
+        activeRegion = null;
+        pendingReplaceRange = null;
         wavesurfer.load(currentWaveUrl);
         $('#wave-save, #wave-undo').removeClass('hidden');
         requestAutoSave();
@@ -167,11 +171,15 @@ jQuery(document).ready(function ($) {
         el.classList.remove('hidden');
     }
 
-    function openAddSpeechAt(timeSeconds, clientX, clientY) {
+    function openAddSpeechAt(timeSeconds, clientX, clientY, options = {}) {
         if (!wavesurfer) return;
         const duration = wavesurfer.getDuration() || 0;
         if (!duration) return;
         lastInsertTime = Math.max(0, Math.min(duration, Number(timeSeconds) || 0));
+        pendingReplaceRange = options && options.replaceRange ? {
+            start: Number(options.replaceRange.start) || 0,
+            end: Number(options.replaceRange.end) || 0
+        } : null;
 
         const $modal = $('#wave-mini-modal');
         $modal.removeClass('hidden').css({ left: `${clientX}px`, top: `${clientY}px` });
@@ -243,7 +251,13 @@ jQuery(document).ready(function ($) {
             }
         } else if (action === 'voice') {
             hideSegmentMenu();
-            openAddSpeechAt(activeRegion.start, lastPointer.clientX || 0, lastPointer.clientY || 0);
+            pendingReplaceRange = {
+                start: activeRegion.start,
+                end: activeRegion.end
+            };
+            openAddSpeechAt(activeRegion.start, lastPointer.clientX || 0, lastPointer.clientY || 0, {
+                replaceRange: pendingReplaceRange
+            });
         }
     });
 
@@ -309,12 +323,24 @@ jQuery(document).ready(function ($) {
             const res = await fetch(withCacheBuster(url), { cache: 'no-store' });
             const arrayBuf = await res.arrayBuffer();
             const buf = await ctx.decodeAudioData(arrayBuf);
-            
-            console.log("Waveform: Inserting clip at", lastInsertTime);
-            const newBuf = await window.VoiceQwen.insertAudioAt(window.VoiceQwen.activeAudioBuffer, buf, lastInsertTime);
+
+            let baseBuffer = window.VoiceQwen.activeAudioBuffer;
+            let insertTime = lastInsertTime;
+            if (pendingReplaceRange && pendingReplaceRange.end > pendingReplaceRange.start) {
+                baseBuffer = window.VoiceQwen.deleteSegment(
+                    window.VoiceQwen.activeAudioBuffer,
+                    pendingReplaceRange.start,
+                    pendingReplaceRange.end
+                );
+                insertTime = pendingReplaceRange.start;
+            }
+
+            console.log("Waveform: Inserting clip at", insertTime, pendingReplaceRange ? '(replace region)' : '(insert point)');
+            const newBuf = await window.VoiceQwen.insertAudioAt(baseBuffer, buf, insertTime);
             
             window.VoiceQwen.waveUndoStack.push(window.VoiceQwen.activeAudioBuffer);
             window.VoiceQwen.activeAudioBuffer = newBuf;
+            pendingReplaceRange = null;
             
             updateWaveformPreview();
             $('#wave-mini-modal').addClass('hidden');
@@ -323,6 +349,7 @@ jQuery(document).ready(function ($) {
         } catch (e) { 
             console.error("Insertion error:", e);
             alert("Error al insertar: " + e.message); 
+            pendingReplaceRange = null;
             $('#mini-generate-btn').prop('disabled', false).text('GENERATE & INSERT');
         }
     }
@@ -398,7 +425,10 @@ jQuery(document).ready(function ($) {
         });
     }
 
-    $(document).on('click', '#mini-modal-close', () => $('#wave-mini-modal').addClass('hidden'));
+    $(document).on('click', '#mini-modal-close', () => {
+        pendingReplaceRange = null;
+        $('#wave-mini-modal').addClass('hidden');
+    });
 
     // Draggable Mini Modal
     let miniGrabX, miniGrabY;
