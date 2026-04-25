@@ -171,8 +171,16 @@ function voiceqwen_add_to_menu( $page_id ) {
     }
 
     if ( $menu_id ) {
+        // First, check if it's already there to avoid duplicates
+        $items = wp_get_nav_menu_items($menu_id);
+        if ($items) {
+            foreach ($items as $item) {
+                if ($item->object_id == $page_id) return; 
+            }
+        }
+
         wp_update_nav_menu_item( $menu_id, 0, array(
-            'menu-item-title'     => 'LOCUTOR',
+            'menu-item-title'     => get_the_title($page_id),
             'menu-item-object-id' => $page_id,
             'menu-item-object'    => 'page',
             'menu-item-type'      => 'post_type',
@@ -181,28 +189,157 @@ function voiceqwen_add_to_menu( $page_id ) {
     }
 }
 
+function voiceqwen_remove_from_menu( $page_id_or_title ) {
+    // 1. Classic Menus (Aggressive)
+    $menus = wp_get_nav_menus();
+    if ($menus) {
+        foreach ($menus as $menu) {
+            $items = wp_get_nav_menu_items($menu->term_id);
+            if ($items) {
+                foreach ($items as $item) {
+                    $title = trim($item->title);
+                    if (strcasecmp($title, 'Audi') === 0 || strcasecmp($title, 'Temu') === 0 || strcasecmp($title, 'Audiobook') === 0) {
+                        $current_page_meta = get_posts(array('post_type' => 'page', 'meta_key' => '_vq_page_type', 'meta_value' => 'audiobook', 'posts_per_page' => 1));
+                        $current_id = $current_page_meta ? $current_page_meta[0]->ID : 0;
+                        if ($item->object_id == $current_id && get_option('voiceqwen_audiobook_show_in_menu', 'yes') === 'yes') continue;
+                        wp_delete_post($item->ID, true);
+                    }
+                }
+            }
+        }
+    }
+
+    // 2. Block Themes (FSE) - Aggressive Regex Brute Force
+    $nav_related_posts = get_posts(array(
+        'post_type' => array('wp_navigation', 'wp_template_part', 'wp_template'),
+        'post_status' => 'any',
+        'posts_per_page' => -1
+    ));
+
+    $current_page_meta = get_posts(array('post_type' => 'page', 'meta_key' => '_vq_page_type', 'meta_value' => 'audiobook', 'posts_per_page' => 1));
+    $current_id = $current_page_meta ? $current_page_meta[0]->ID : 0;
+    $show_in_menu = get_option('voiceqwen_audiobook_show_in_menu', 'yes');
+
+    foreach ($nav_related_posts as $nav_post) {
+        $content = $nav_post->post_content;
+        $original_content = $content;
+
+        // This regex finds core/navigation-link blocks with labels Audi or Temu
+        // We use a callback to decide whether to keep or kill
+        $pattern = '/<!-- wp:navigation-link {[^}]+} \/-->/s';
+        
+        $content = preg_replace_callback($pattern, function($matches) use ($current_id, $show_in_menu) {
+            $block_json = '';
+            if (preg_match('/{.+}/', $matches[0], $json_match)) {
+                $block_json = $json_match[0];
+            }
+            
+            $attrs = json_decode($block_json, true);
+            $label = isset($attrs['label']) ? $attrs['label'] : '';
+            $id = isset($attrs['id']) ? $attrs['id'] : 0;
+
+            if (strcasecmp($label, 'Audi') === 0 || strcasecmp($label, 'Temu') === 0 || strcasecmp($label, 'Audiobook') === 0) {
+                // Keep ONLY if it's our current official ID AND we want it shown
+                if ($id == $current_id && $show_in_menu === 'yes') {
+                    return $matches[0];
+                }
+                return ''; // KILL
+            }
+            return $matches[0];
+        }, $content);
+
+        if ($content !== $original_content) {
+            wp_update_post(array(
+                'ID' => $nav_post->ID,
+                'post_content' => $content
+            ));
+        }
+    }
+}
+
 // 6. Ensure Pages Exist
 function voiceqwen_ensure_pages() {
     $audi_title = get_option('voiceqwen_audiobook_page_name', 'Audi');
     $audi_slug = get_option('voiceqwen_audiobook_page_slug', 'audi');
+    $show_in_menu = get_option('voiceqwen_audiobook_show_in_menu', 'yes');
+
+    // 1. CLEANUP DUPLICATES AND GHOST PAGES BY TITLE
+    $ghost_titles = array('Audi', 'Temu', 'Audiobook');
+    foreach ($ghost_titles as $g_title) {
+        $ghosts = get_posts(array(
+            'post_type' => 'page',
+            'title' => $g_title,
+            'post_status' => 'any',
+            'posts_per_page' => -1
+        ));
+        
+        if ($ghosts) {
+            foreach ($ghosts as $ghost) {
+                // Keep ONLY if it's the official one with the meta tag
+                $is_official = get_post_meta($ghost->ID, '_vq_page_type', true) === 'audiobook';
+                // If it's the official one but the title has changed, we still keep it (logic below handles update)
+                // BUT if we have multiple "officials", we only keep the first one found
+                static $official_kept = false;
+                if ($is_official && !$official_kept) {
+                    $official_kept = true;
+                    continue;
+                }
+                
+                voiceqwen_remove_from_menu($ghost->ID);
+                wp_delete_post($ghost->ID, true);
+            }
+        }
+    }
+
+    // Re-verify main page after cleanup
+    $existing_audiobook_pages = get_posts(array(
+        'post_type' => 'page', 
+        'meta_key' => '_vq_page_type', 
+        'meta_value' => 'audiobook', 
+        'posts_per_page' => 1,
+        'post_status' => 'publish'
+    ));
+    $main_page = $existing_audiobook_pages ? $existing_audiobook_pages[0] : null;
 
     $pages = array(
         'voice'    => 'LOCUTOR',
-        $audi_slug => $audi_title
+        'audi_dyn' => $audi_title
     );
 
-    foreach ( $pages as $slug => $title ) {
-        $page = get_page_by_path( $slug );
+    foreach ( $pages as $key => $title ) {
+        $slug = ($key === 'voice') ? 'voice' : $audi_slug;
+        $page = ($key === 'voice') ? get_page_by_path('voice') : $main_page;
+
         if ( ! $page ) {
             $page_id = wp_insert_post( array(
                 'post_title'   => $title,
-                'post_content' => ( $slug === 'voice' ) ? '[voiceqwen_ui]' : '',
+                'post_content' => ( $key === 'voice' ) ? '[voiceqwen_ui]' : '',
                 'post_status'  => 'publish',
                 'post_type'    => 'page',
                 'post_name'    => $slug,
             ) );
-            if ( $slug === 'voice' ) {
+            if ($key !== 'voice') {
+                update_post_meta($page_id, '_vq_page_type', 'audiobook');
+            }
+            if ( $key === 'voice' || ($key === 'audi_dyn' && $show_in_menu === 'yes') ) {
                 voiceqwen_add_to_menu( $page_id );
+            }
+        } else {
+            // Update existing
+            if ($page->post_title !== $title || $page->post_name !== $slug) {
+                wp_update_post(array(
+                    'ID' => $page->ID,
+                    'post_title' => $title,
+                    'post_name' => $slug
+                ));
+            }
+            
+            if ($key === 'audi_dyn') {
+                if ($show_in_menu === 'yes') {
+                    voiceqwen_add_to_menu($page->ID);
+                } else {
+                    voiceqwen_remove_from_menu($page->ID);
+                }
             }
         }
     }
@@ -224,21 +361,26 @@ function voiceqwen_add_admin_menu() {
 add_action( 'admin_menu', 'voiceqwen_add_admin_menu' );
 
 function voiceqwen_render_settings_page() {
-    if (isset($_POST['voiceqwen_save_admin_settings'])) {
-        check_admin_referer('voiceqwen_admin_nonce');
-        
+    if (isset($_POST['voiceqwen_save_admin_settings']) && check_admin_referer('voiceqwen_admin_nonce')) {
         $new_name = sanitize_text_field($_POST['audiobook_page_name']);
-        $old_name = get_option('voiceqwen_audiobook_page_name');
+        $old_name = get_option('voiceqwen_audiobook_page_name', 'Audi');
         
+        update_option('voiceqwen_storage_mode', sanitize_text_field($_POST['storage_mode']));
+        update_option('voiceqwen_r2_account_id', sanitize_text_field($_POST['r2_account_id']));
+        update_option('voiceqwen_r2_access_key', sanitize_text_field($_POST['r2_access_key']));
+        update_option('voiceqwen_r2_secret_key', sanitize_text_field($_POST['r2_secret_key']));
+        update_option('voiceqwen_r2_bucket_name', sanitize_text_field($_POST['r2_bucket_name']));
+        
+        $show_in_menu = isset($_POST['show_in_menu']) ? 'yes' : 'no';
+        update_option('voiceqwen_audiobook_show_in_menu', $show_in_menu);
+
         if ($new_name !== $old_name) {
             update_option('voiceqwen_audiobook_page_name', $new_name);
             update_option('voiceqwen_audiobook_page_slug', sanitize_title($new_name));
-            
-            // Re-run page ensure logic to create/update the page
-            voiceqwen_ensure_pages();
         }
-
-        echo '<div class="updated"><p>Settings saved!</p></div>';
+        
+        voiceqwen_ensure_pages();
+        echo '<div class="updated"><p>Settings saved successfully!</p></div>';
     }
 
     $page_name = get_option('voiceqwen_audiobook_page_name', 'Audi');
@@ -247,35 +389,7 @@ function voiceqwen_render_settings_page() {
     $r2_access_key = get_option('voiceqwen_r2_access_key', '');
     $r2_secret_key = get_option('voiceqwen_r2_secret_key', '');
     $r2_bucket_name = get_option('voiceqwen_r2_bucket_name', '');
-
-    if (isset($_POST['voiceqwen_save_admin_settings'])) {
-        check_admin_referer('voiceqwen_admin_nonce');
-        
-        $new_name = sanitize_text_field($_POST['audiobook_page_name']);
-        $old_name = get_option('voiceqwen_audiobook_page_name');
-        
-        update_option('voiceqwen_storage_mode', sanitize_text_field($_POST['storage_mode']));
-        update_option('voiceqwen_r2_account_id', sanitize_text_field($_POST['r2_account_id']));
-        update_option('voiceqwen_r2_access_key', sanitize_text_field($_POST['r2_access_key']));
-        update_option('voiceqwen_r2_secret_key', sanitize_text_field($_POST['r2_secret_key']));
-        update_option('voiceqwen_r2_bucket_name', sanitize_text_field($_POST['r2_bucket_name']));
-
-        if ($new_name !== $old_name) {
-            update_option('voiceqwen_audiobook_page_name', $new_name);
-            update_option('voiceqwen_audiobook_page_slug', sanitize_title($new_name));
-            voiceqwen_ensure_pages();
-        }
-
-        echo '<div class="updated"><p>Settings saved!</p></div>';
-        
-        // Refresh values
-        $page_name = $new_name;
-        $storage_mode = sanitize_text_field($_POST['storage_mode']);
-        $r2_account_id = sanitize_text_field($_POST['r2_account_id']);
-        $r2_access_key = sanitize_text_field($_POST['r2_access_key']);
-        $r2_secret_key = sanitize_text_field($_POST['r2_secret_key']);
-        $r2_bucket_name = sanitize_text_field($_POST['r2_bucket_name']);
-    }
+    $show_in_menu = get_option('voiceqwen_audiobook_show_in_menu', 'yes');
     ?>
     <div class="wrap">
         <h1>LOCUTOR Settings</h1>
@@ -283,12 +397,29 @@ function voiceqwen_render_settings_page() {
             <?php wp_nonce_field('voiceqwen_admin_nonce'); ?>
             
             <h2>General Settings</h2>
+            <?php 
+            $page_name = get_option('voiceqwen_audiobook_page_name', 'Audi');
+            $existing = get_posts(array('post_type' => 'page', 'meta_key' => '_vq_page_type', 'meta_value' => 'audiobook', 'posts_per_page' => 1));
+            $page_url = $existing ? get_permalink($existing[0]->ID) : home_url(get_option('voiceqwen_audiobook_page_slug', 'audi'));
+            ?>
             <table class="form-table">
                 <tr>
                     <th scope="row"><label for="audiobook_page_name">Audiobook Manager Page Name</label></th>
                     <td>
-                        <input name="audiobook_page_name" type="text" id="audiobook_page_name" value="<?php echo esc_attr($page_name); ?>" class="regular-text">
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <input name="audiobook_page_name" type="text" id="audiobook_page_name" value="<?php echo esc_attr($page_name); ?>" class="regular-text">
+                            <a href="<?php echo esc_url($page_url); ?>" class="button button-primary" target="_blank">GO TO PAGE</a>
+                        </div>
                         <p class="description">This name will be used to create the page and its URL slug.</p>
+                    </td>
+                </tr>
+                <tr>
+                    <th scope="row">Menu Visibility</th>
+                    <td>
+                        <label>
+                            <input type="checkbox" name="show_in_menu" value="yes" <?php checked(get_option('voiceqwen_audiobook_show_in_menu', 'yes'), 'yes'); ?>>
+                            Show in main menu
+                        </label>
                     </td>
                 </tr>
             </table>
