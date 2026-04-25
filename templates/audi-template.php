@@ -284,6 +284,7 @@
             <div class="top-bar-nav">
                 <button id="nav-audiobook" class="nav-item-btn active">AUDIOBOOK</button>
                 <button id="nav-files" class="nav-item-btn">FILES</button>
+                <button id="nav-config" class="nav-item-btn">CONFIG</button>
             </div>
         </div>
 
@@ -340,6 +341,7 @@
         <div class="vq-bw-waveform">
             <div class="voiceqwen-theme-90ties">
                 <?php include plugin_dir_path( dirname( __FILE__ ) ) . 'templates/views/view-waveform.php'; ?>
+                <?php include plugin_dir_path( dirname( __FILE__ ) ) . 'templates/views/view-settings.php'; ?>
             </div>
             <?php include plugin_dir_path( dirname( __FILE__ ) ) . 'templates/views/mini-modal.php'; ?>
         </div>
@@ -373,6 +375,14 @@ jQuery(document).ready(function($) {
         $('.view-container').removeClass('active').addClass('hidden').hide();
         $('#view-finder').addClass('active').removeClass('hidden').show();
         loadFiles();
+    });
+
+    $('#nav-config').on('click', function() {
+        $('.nav-item-btn').removeClass('active');
+        $(this).addClass('active');
+        $('.view-container, .view-pane').removeClass('active').addClass('hidden').hide();
+        $('#view-settings').addClass('active').removeClass('hidden').show();
+        $('#view-settings').css({ 'display': 'block', 'opacity': 1, 'visibility': 'visible' });
     });
 
     // --- Finder Logic ---

@@ -8,7 +8,9 @@
                 <h2>AUDIOBOOK MANAGER</h2>
             </div>
             <div class="header-right">
+                <button id="vq-import-book-btn" class="nav-btn">IMPORT</button>
                 <button id="vq-create-book-btn" class="nav-btn">+ CREATE NEW</button>
+                <input type="file" id="vq-import-file-input" style="display:none;" accept=".json">
             </div>
         </div>
 

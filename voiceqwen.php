@@ -21,6 +21,7 @@ require_once plugin_dir_path( __FILE__ ) . 'includes/class-voiceqwen-audio-analy
 require_once plugin_dir_path( __FILE__ ) . 'modules/audiobook/audiobook.php';
 
 // 2. Custom Template Loader
+// 2. Custom Template Loader
 function voiceqwen_custom_template( $template ) {
     if ( is_page( 'voice' ) ) {
         $custom_template = plugin_dir_path( __FILE__ ) . 'templates/voice-template.php';
@@ -28,7 +29,10 @@ function voiceqwen_custom_template( $template ) {
             return $custom_template;
         }
     }
-    if ( is_page( 'audi' ) ) {
+    
+    // Dynamic Audiobook Page
+    $audi_slug = get_option('voiceqwen_audiobook_page_slug', 'audi');
+    if ( is_page( $audi_slug ) ) {
         $custom_template = plugin_dir_path( __FILE__ ) . 'templates/audi-template.php';
         if ( file_exists( $custom_template ) ) {
             return $custom_template;
@@ -49,6 +53,7 @@ function voiceqwen_enqueue_assets() {
     wp_enqueue_script( 'wavesurfer-regions', 'https://unpkg.com/wavesurfer.js@7.12.6/dist/plugins/regions.min.js', array( 'wavesurfer' ), '7.12.6', true );
     wp_enqueue_script( 'wavesurfer-timeline', 'https://unpkg.com/wavesurfer.js@7.12.6/dist/plugins/timeline.min.js', array( 'wavesurfer' ), '7.12.6', true );
     wp_enqueue_script( 'sortablejs', 'https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js', array(), '1.15.0', true );
+    wp_enqueue_style( 'material-symbols', 'https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200' );
 
     wp_enqueue_script( 'voiceqwen-core', plugins_url( 'assets/js/core.js', __FILE__ ), array( 'jquery' ), '1.1', true );
     wp_enqueue_script( 'voiceqwen-generation', plugins_url( 'assets/js/generation.js', __FILE__ ), array( 'voiceqwen-core' ), '1.1', true );
@@ -178,9 +183,12 @@ function voiceqwen_add_to_menu( $page_id ) {
 
 // 6. Ensure Pages Exist
 function voiceqwen_ensure_pages() {
+    $audi_title = get_option('voiceqwen_audiobook_page_name', 'Audi');
+    $audi_slug = get_option('voiceqwen_audiobook_page_slug', 'audi');
+
     $pages = array(
-        'voice' => 'LOCUTOR',
-        'audi'  => 'Audi'
+        'voice'    => 'LOCUTOR',
+        $audi_slug => $audi_title
     );
 
     foreach ( $pages as $slug => $title ) {
@@ -200,3 +208,132 @@ function voiceqwen_ensure_pages() {
     }
 }
 add_action( 'admin_init', 'voiceqwen_ensure_pages' );
+
+// 7. Admin Settings Page
+function voiceqwen_add_admin_menu() {
+    add_menu_page(
+        'LOCUTOR Settings',
+        'LOCUTOR',
+        'manage_options',
+        'voiceqwen-settings',
+        'voiceqwen_render_settings_page',
+        'dashicons-microphone',
+        30
+    );
+}
+add_action( 'admin_menu', 'voiceqwen_add_admin_menu' );
+
+function voiceqwen_render_settings_page() {
+    if (isset($_POST['voiceqwen_save_admin_settings'])) {
+        check_admin_referer('voiceqwen_admin_nonce');
+        
+        $new_name = sanitize_text_field($_POST['audiobook_page_name']);
+        $old_name = get_option('voiceqwen_audiobook_page_name');
+        
+        if ($new_name !== $old_name) {
+            update_option('voiceqwen_audiobook_page_name', $new_name);
+            update_option('voiceqwen_audiobook_page_slug', sanitize_title($new_name));
+            
+            // Re-run page ensure logic to create/update the page
+            voiceqwen_ensure_pages();
+        }
+
+        echo '<div class="updated"><p>Settings saved!</p></div>';
+    }
+
+    $page_name = get_option('voiceqwen_audiobook_page_name', 'Audi');
+    $storage_mode = get_option('voiceqwen_storage_mode', 'local');
+    $r2_account_id = get_option('voiceqwen_r2_account_id', '');
+    $r2_access_key = get_option('voiceqwen_r2_access_key', '');
+    $r2_secret_key = get_option('voiceqwen_r2_secret_key', '');
+    $r2_bucket_name = get_option('voiceqwen_r2_bucket_name', '');
+
+    if (isset($_POST['voiceqwen_save_admin_settings'])) {
+        check_admin_referer('voiceqwen_admin_nonce');
+        
+        $new_name = sanitize_text_field($_POST['audiobook_page_name']);
+        $old_name = get_option('voiceqwen_audiobook_page_name');
+        
+        update_option('voiceqwen_storage_mode', sanitize_text_field($_POST['storage_mode']));
+        update_option('voiceqwen_r2_account_id', sanitize_text_field($_POST['r2_account_id']));
+        update_option('voiceqwen_r2_access_key', sanitize_text_field($_POST['r2_access_key']));
+        update_option('voiceqwen_r2_secret_key', sanitize_text_field($_POST['r2_secret_key']));
+        update_option('voiceqwen_r2_bucket_name', sanitize_text_field($_POST['r2_bucket_name']));
+
+        if ($new_name !== $old_name) {
+            update_option('voiceqwen_audiobook_page_name', $new_name);
+            update_option('voiceqwen_audiobook_page_slug', sanitize_title($new_name));
+            voiceqwen_ensure_pages();
+        }
+
+        echo '<div class="updated"><p>Settings saved!</p></div>';
+        
+        // Refresh values
+        $page_name = $new_name;
+        $storage_mode = sanitize_text_field($_POST['storage_mode']);
+        $r2_account_id = sanitize_text_field($_POST['r2_account_id']);
+        $r2_access_key = sanitize_text_field($_POST['r2_access_key']);
+        $r2_secret_key = sanitize_text_field($_POST['r2_secret_key']);
+        $r2_bucket_name = sanitize_text_field($_POST['r2_bucket_name']);
+    }
+    ?>
+    <div class="wrap">
+        <h1>LOCUTOR Settings</h1>
+        <form method="post">
+            <?php wp_nonce_field('voiceqwen_admin_nonce'); ?>
+            
+            <h2>General Settings</h2>
+            <table class="form-table">
+                <tr>
+                    <th scope="row"><label for="audiobook_page_name">Audiobook Manager Page Name</label></th>
+                    <td>
+                        <input name="audiobook_page_name" type="text" id="audiobook_page_name" value="<?php echo esc_attr($page_name); ?>" class="regular-text">
+                        <p class="description">This name will be used to create the page and its URL slug.</p>
+                    </td>
+                </tr>
+            </table>
+
+            <h2>Cloudflare R2 Configuration</h2>
+            <table class="form-table">
+                <tr>
+                    <th scope="row"><label for="storage_mode">Storage Mode</label></th>
+                    <td>
+                        <select name="storage_mode" id="storage_mode">
+                            <option value="local" <?php selected($storage_mode, 'local'); ?>>Local Only</option>
+                            <option value="r2" <?php selected($storage_mode, 'r2'); ?>>Cloudflare R2 (Hybrid)</option>
+                        </select>
+                    </td>
+                </tr>
+                <tr>
+                    <th scope="row"><label for="r2_account_id">R2 Account ID</label></th>
+                    <td>
+                        <input name="r2_account_id" type="text" id="r2_account_id" value="<?php echo esc_attr($r2_account_id); ?>" class="regular-text">
+                    </td>
+                </tr>
+                <tr>
+                    <th scope="row"><label for="r2_access_key">Access Key ID</label></th>
+                    <td>
+                        <input name="r2_access_key" type="text" id="r2_access_key" value="<?php echo esc_attr($r2_access_key); ?>" class="regular-text">
+                    </td>
+                </tr>
+                <tr>
+                    <th scope="row"><label for="r2_secret_key">Secret Access Key</label></th>
+                    <td>
+                        <input name="r2_secret_key" type="password" id="r2_secret_key" value="<?php echo esc_attr($r2_secret_key); ?>" class="regular-text">
+                    </td>
+                </tr>
+                <tr>
+                    <th scope="row"><label for="r2_bucket_name">Bucket Name</label></th>
+                    <td>
+                        <input name="r2_bucket_name" type="text" id="r2_bucket_name" value="<?php echo esc_attr($r2_bucket_name); ?>" class="regular-text">
+                    </td>
+                </tr>
+            </table>
+
+            <p class="submit">
+                <input type="submit" name="voiceqwen_save_admin_settings" id="submit" class="button button-primary" value="Save All Changes">
+            </p>
+        </form>
+    </div>
+    <?php
+}

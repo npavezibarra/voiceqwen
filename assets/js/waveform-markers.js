@@ -317,7 +317,8 @@ jQuery(document).ready(function ($) {
         el.className = 'vq-point-menu hidden';
         el.innerHTML = ''
             + '<button type="button" class="vq-point-btn" data-action="voice">VOICE</button>'
-            + '<button type="button" class="vq-point-btn" data-action="marker">MARKER</button>';
+            + '<button type="button" class="vq-point-btn" data-action="marker">MARKER</button>'
+            + '<button type="button" class="vq-point-btn hidden" id="vq-paste-btn" data-action="paste">PASTE</button>';
         document.body.appendChild(el);
     }
 
@@ -326,6 +327,16 @@ jQuery(document).ready(function ($) {
         lastPoint = { clientX, clientY, t };
         const el = document.getElementById('wave-point-menu');
         if (!el) return;
+
+        const pasteBtn = document.getElementById('vq-paste-btn');
+        if (pasteBtn) {
+            if (window.VoiceQwen && window.VoiceQwen.copiedAudioBuffer) {
+                pasteBtn.classList.remove('hidden');
+            } else {
+                pasteBtn.classList.add('hidden');
+            }
+        }
+
         el.style.left = clientX + 'px';
         el.style.top = clientY + 'px';
         el.classList.remove('hidden');
@@ -357,7 +368,7 @@ jQuery(document).ready(function ($) {
         } catch (_) {}
     }, true);
 
-    $(document).on('click', '#wave-point-menu .vq-point-btn', function (e) {
+    $(document).on('click', '#wave-point-menu .vq-point-btn', async function (e) {
         e.preventDefault();
         const action = $(this).data('action');
         if (action === 'marker') {
@@ -369,6 +380,18 @@ jQuery(document).ready(function ($) {
             hidePointMenu();
             if (window.VoiceQwen && typeof window.VoiceQwen.openAddSpeechAt === 'function') {
                 window.VoiceQwen.openAddSpeechAt(lastPoint.t, lastPoint.clientX, lastPoint.clientY);
+            }
+            return;
+        }
+        if (action === 'paste') {
+            hidePointMenu();
+            if (window.VoiceQwen && window.VoiceQwen.copiedAudioBuffer) {
+                const newBuf = await window.VoiceQwen.insertAudioAt(window.VoiceQwen.activeAudioBuffer, window.VoiceQwen.copiedAudioBuffer, lastPoint.t);
+                window.VoiceQwen.waveUndoStack.push(window.VoiceQwen.activeAudioBuffer);
+                window.VoiceQwen.activeAudioBuffer = newBuf;
+                if (typeof window.VoiceQwen.updateWaveformPreview === 'function') {
+                    window.VoiceQwen.updateWaveformPreview();
+                }
             }
         }
     });

@@ -5,7 +5,13 @@
             <div class="vapor-dots"><span></span><span></span><span></span></div>
             <div class="vapor-window-title">WAVEFORM VISUALIZER</div>
         </div>
-        <button id="toggle-sidebar-btn" class="nav-btn" style="width: auto; margin: 0; padding: 2px 12px; font-size: 14px; background: #0000ff; color: #fff; border: 2px solid #000;">FILES</button>
+        <div style="display: flex; gap: 10px; align-items: center;">
+            <button id="wave-sync-r2" class="nav-btn hidden" style="width: auto; margin: 0; padding: 2px 12px; font-size: 14px; background: #27c93f; color: #fff; border: 2px solid #000; display: flex; align-items: center; gap: 5px;">
+                <span class="material-symbols-outlined" style="font-size: 18px;">cloud_upload</span>
+                UPLOAD
+            </button>
+            <button id="toggle-sidebar-btn" class="nav-btn" style="width: auto; margin: 0; padding: 2px 12px; font-size: 14px; background: #0000ff; color: #fff; border: 2px solid #000;">FILES</button>
+        </div>
     </div>
     <div class="vapor-pane">
         <div id="wave-viewer-empty" style="text-align: center; padding: 50px; color: #0000ff; border: 2px dashed #0000ff; background: rgba(0,0,255,0.05);">

@@ -96,14 +96,12 @@ class R2Client
             ]);
             return true;
         } catch (AwsException $e) {
-            $error_data = [
-                'message' => $e->getMessage(),
-                'code' => $e->getAwsErrorCode(),
-                'type' => $e->getAwsErrorType(),
-                'response' => $e->getCommand()->getName()
-            ];
-            error_log('VoiceQwen R2 Upload Details: ' . print_r($error_data, true));
-            return false;
+            $msg = $e->getAwsErrorMessage() ?: $e->getMessage();
+            error_log('VoiceQwen R2 Upload Error: ' . $msg);
+            return $msg;
+        } catch (\Exception $e) {
+            error_log('VoiceQwen R2 Upload Exception: ' . $e->getMessage());
+            return $e->getMessage();
         }
     }
 
@@ -165,6 +163,25 @@ class R2Client
      *
      * @return bool|string True on success, error message on failure.
      */
+    /**
+     * Check if an object exists in the bucket.
+     *
+     * @param string $key The object key to check.
+     * @return bool True if exists, false otherwise.
+     */
+    public function object_exists(string $key): bool
+    {
+        if (!$this->s3_client || !$this->bucket) {
+            return false;
+        }
+
+        try {
+            return $this->s3_client->doesObjectExistV2($this->bucket, $key);
+        } catch (\Exception $e) {
+            return false;
+        }
+    }
+
     public function test_connection()
     {
         if (!$this->s3_client) {
@@ -186,6 +203,25 @@ class R2Client
             return $e->getAwsErrorMessage() ?: $e->getMessage();
         } catch (\Exception $e) {
             return $e->getMessage();
+        }
+    }
+
+    /**
+     * Get object contents from R2.
+     */
+    public function get_object(string $key)
+    {
+        if (!$this->s3_client || !$this->bucket) {
+            return false;
+        }
+        try {
+            $result = $this->s3_client->getObject([
+                'Bucket' => $this->bucket,
+                'Key'    => $key,
+            ]);
+            return $result['Body']->getContents();
+        } catch (\Exception $e) {
+            return false;
         }
     }
 }

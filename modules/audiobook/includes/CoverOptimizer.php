@@ -12,7 +12,7 @@ class CoverOptimizer
      *
      * @return array{path:string,mime:string,error?:string}
      */
-    public static function optimize_to_jpeg(string $src_path, int $max_bytes = 600000, int $max_dim = 1200): array
+    public static function optimize_to_jpeg(string $src_path, int $max_bytes = 614400, int $max_dim = 1000): array
     {
         if (!file_exists($src_path)) {
             return array('path' => '', 'mime' => '', 'error' => 'Missing file');
@@ -34,19 +34,27 @@ class CoverOptimizer
             return array('path' => '', 'mime' => '', 'error' => 'Invalid image');
         }
 
-        // Resize down to a reasonable maximum dimension.
-        if (max($w, $h) > $max_dim) {
+        // 1. Crop to square (Center)
+        $dim = min($w, $h);
+        $x = ($w - $dim) / 2;
+        $y = ($h - $dim) / 2;
+        $editor->crop($x, $y, $dim, $dim);
+
+        // 2. Resize if too large
+        if ($dim > $max_dim) {
             $editor->resize($max_dim, $max_dim, false);
         }
 
         $upload_dir = wp_upload_dir();
         $tmp_dir = rtrim($upload_dir['basedir'], '/') . '/voiceqwen-tmp';
         if (!file_exists($tmp_dir)) {
-            @mkdir($tmp_dir, 0755, true);
+            if (!wp_mkdir_p($tmp_dir)) {
+                return array('path' => '', 'mime' => '', 'error' => 'Could not create temporary directory: ' . $tmp_dir);
+            }
         }
         $tmp_path = $tmp_dir . '/cover_' . time() . '_' . wp_generate_password(6, false, false) . '.jpg';
 
-        $quality_steps = array(82, 75, 68, 60, 52, 45, 40);
+        $quality_steps = array(90, 82, 75, 68, 60, 52, 45, 35);
         $passes = 0;
 
         while ($passes < 4) {
@@ -65,17 +73,15 @@ class CoverOptimizer
 
             // Still too large: reduce dimensions and try again.
             $size = $editor->get_size();
-            $w = isset($size['width']) ? intval($size['width']) : 0;
-            $h = isset($size['height']) ? intval($size['height']) : 0;
-            if ($w <= 0 || $h <= 0) break;
+            $curr_w = isset($size['width']) ? intval($size['width']) : 0;
+            if ($curr_w <= 320) break;
 
-            $nw = max(320, (int) floor($w * 0.85));
-            $nh = max(320, (int) floor($h * 0.85));
-            $editor->resize($nw, $nh, false);
+            $new_dim = max(320, (int) floor($curr_w * 0.8));
+            $editor->resize($new_dim, $new_dim, false);
             $passes++;
         }
 
-        // Best-effort return (might be > max_bytes, but still optimized).
+        // Best-effort return
         if (file_exists($tmp_path)) {
             return array('path' => $tmp_path, 'mime' => 'image/jpeg');
         }

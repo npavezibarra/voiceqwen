@@ -1,7 +1,7 @@
 window.VoiceQwen = window.VoiceQwen || {};
 
 jQuery(document).ready(function ($) {
-    let wavesurfer = null, wsRegions = null, activeFileName = '', activeFileRelPath = '', activeFileUrl = '', currentWaveUrl = '';
+    let wavesurfer = null, wsRegions = null, activeFileName = '', activeFileRelPath = '', activeFileUrl = '', currentWaveUrl = '', activePostId = 0;
     let isDraggingMini = false, dragStartX, dragStartY, modalStartX, modalStartY;
     let autoSaveTimer = null, lastInsertTime = 0;
     let sessionTempClips = [];
@@ -12,6 +12,7 @@ jQuery(document).ready(function ($) {
     window.VoiceQwen.loadWaveform = loadWaveform;
     window.VoiceQwen.handleInsertion = handleInsertion;
     window.VoiceQwen.openAddSpeechAt = openAddSpeechAt;
+    window.VoiceQwen.updateWaveformPreview = updateWaveformPreview;
 
     function getAudioCtx() { return window.VoiceQwen.getAudioCtx(); }
 
@@ -26,20 +27,26 @@ jQuery(document).ready(function ($) {
         }
     }
 
-    async function loadWaveform(url, filename, hasBackup = false, hasAutosave = false, autosaveUrl = '', relPath = '') {
+    async function loadWaveform(url, filename, hasBackup = false, hasAutosave = false, autosaveUrl = '', relPath = '', postId = 0) {
         if (window.VoiceQwen.isLoadingWaveform) return;
         window.VoiceQwen.isLoadingWaveform = true;
 
         if (hasAutosave && autosaveUrl && confirm("¿Recuperar cambios automáticos?")) url = autosaveUrl;
 
-        activeFileName = filename;
         activeFileRelPath = relPath || filename;
         activeFileUrl = url;
+        activePostId = postId || 0;
         window.VoiceQwen.activeFileRelPath = activeFileRelPath;
         sessionTempClips = [];
         $('#wave-viewer-empty, #wave-viewer-container').addClass('hidden');
         $('#wave-viewer-loading').removeClass('hidden');
         $('#waveform-title').text(filename);
+
+        if (relPath) {
+            $('#wave-sync-r2').removeClass('hidden');
+        } else {
+            $('#wave-sync-r2').addClass('hidden');
+        }
         // Timeline needs real layout width at init time. Keep the container in the flow but hidden.
         $('#wave-viewer-container').removeClass('hidden').css({ visibility: 'hidden' });
         $('#waveform').empty();
@@ -142,6 +149,9 @@ jQuery(document).ready(function ($) {
         pendingReplaceRange = null;
         wavesurfer.load(currentWaveUrl);
         $('#wave-save, #wave-undo').removeClass('hidden');
+        if (activeFileRelPath) {
+            $('#wave-sync-r2').removeClass('hidden');
+        }
         requestAutoSave();
     }
 
@@ -151,6 +161,7 @@ jQuery(document).ready(function ($) {
         el.id = 'wave-segment-menu';
         el.className = 'vq-segment-menu hidden';
         el.innerHTML = `
+            <button type="button" class="vq-seg-btn" data-action="copy">COPY</button>
             <button type="button" class="vq-seg-btn" data-action="delete">DELETE</button>
             <button type="button" class="vq-seg-btn" data-action="voice">VOICE</button>
         `;
@@ -248,6 +259,20 @@ jQuery(document).ready(function ($) {
                 window.VoiceQwen.activeAudioBuffer = newBuf;
                 updateWaveformPreview();
                 hideSegmentMenu();
+            }
+        } else if (action === 'copy') {
+            const segment = window.VoiceQwen.extractSegment(window.VoiceQwen.activeAudioBuffer, activeRegion.start, activeRegion.end);
+            if (segment) {
+                window.VoiceQwen.copiedAudioBuffer = segment;
+                console.log("Waveform: Segment copied to clipboard", segment.duration.toFixed(2), "s");
+                // Visual feedback
+                const $btn = $(this);
+                const originalText = $btn.text();
+                $btn.text('COPIED!').css('color', '#00ff00');
+                setTimeout(() => {
+                    $btn.text(originalText).css('color', '');
+                    hideSegmentMenu();
+                }, 800);
             }
         } else if (action === 'voice') {
             hideSegmentMenu();
@@ -361,6 +386,41 @@ jQuery(document).ready(function ($) {
             updateWaveformPreview();
             if (!window.VoiceQwen.waveUndoStack.length) $(this).addClass('hidden');
         }
+    });
+
+    $(document).on('click', '#wave-sync-r2', function() {
+        if (!activeFileRelPath) return;
+        const $btn = $(this);
+        const originalHtml = $btn.html();
+        
+        $btn.prop('disabled', true).html('<span class="material-symbols-outlined" style="font-size: 18px;">sync</span> SYNCING...');
+
+        $.ajax({
+            url: voiceqwen_ajax.url,
+            type: 'POST',
+            timeout: 30000, // 30 seconds timeout
+            data: {
+                action: 'vq_sync_to_r2',
+                nonce: voiceqwen_ajax.nonce,
+                post_id: activePostId,
+                key: activeFileRelPath
+            },
+            success: function(res) {
+                if (res.success) {
+                    alert("¡Archivo subido a R2 con éxito!");
+                    $btn.addClass('hidden');
+                    // Trigger a refresh of the audiobook list if needed
+                    $(document).trigger('voiceqwen_audio_synced', [activeFileRelPath]);
+                } else {
+                    alert("Error al subir: " + (res.data || 'Respuesta desconocida'));
+                    $btn.prop('disabled', false).html(originalHtml);
+                }
+            },
+            error: function(xhr, status, error) {
+                alert("Error de red o tiempo de espera agotado: " + error);
+                $btn.prop('disabled', false).html(originalHtml);
+            }
+        });
     });
 
     $(document).on('click', '#wave-save', async function() {

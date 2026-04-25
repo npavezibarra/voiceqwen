@@ -113,11 +113,15 @@ jQuery(document).ready(function($) {
             },
             success: function(response) {
                 if (response.success) {
-                    btn.parent().find('.vq-badge-local').replaceWith('<span class="vq-badge vq-badge-r2">R2</span>');
+                    console.log("Sync success for key:", key, "New R2 Key:", response.data.new_key);
+                    const actions = btn.closest('.vq-chapter-actions');
+                    actions.find('.vq-badge-local').replaceWith('<span class="vq-badge vq-badge-r2">R2</span>');
                     btn.remove();
                     item.attr('data-key', response.data.new_key);
+                    item.find('.vq-inline-play').attr('data-key', response.data.new_key).attr('data-storage', 'r2');
                     item.find('.vq-chapter-title').trigger('change'); // Trigger save
                 } else {
+                    console.error("Sync failed:", response.data);
                     alert('Sync failed: ' + response.data);
                     btn.removeClass('vq-syncing').text('↑');
                 }
@@ -402,7 +406,8 @@ jQuery(document).ready(function($) {
 
                     // Load into Waveform Editor
                     if (window.VoiceQwen && typeof window.VoiceQwen.loadWaveform === 'function') {
-                        window.VoiceQwen.loadWaveform(localUrl, displayName, false, false, '', relPath);
+                        window.VoiceQwen.loadWaveform(localUrl, displayName, false, false, '', relPath, postId);
+                        $('.vapor-nav .nav-btn[data-view="waveform"]').click();
                     }
                 } else {
                     alert("Error: " + response.data);
@@ -504,13 +509,28 @@ jQuery(document).ready(function($) {
             success: function(response) {
                 btn.text('Cover');
                 if (response.success) {
-                    const newUrl = response.data;
-                    card.find('.vq-card-header-cover').html(`<img src="${newUrl}" class="vq-mini-cover">`);
-                    $(`.vq-book-item[data-id="${bookId}"] img`).attr('src', newUrl);
-                    if ($(`.vq-book-item[data-id="${bookId}"] .vq-thumb-placeholder`).length) {
-                        $(`.vq-book-item[data-id="${bookId}"] .vq-book-item-thumb`).html(`<img src="${newUrl}">`);
+                    const newUrl = response.data + '?v=' + new Date().getTime();
+                    
+                    // Update Editor Card
+                    const coverContainer = card.find('.vq-card-header-cover');
+                    coverContainer.html(`<img src="${newUrl}" class="vq-mini-cover">`);
+                    
+                    // Update Sidebar List Item
+                    const sidebarItem = $(`.vq-book-item[data-id="${bookId}"]`);
+                    const thumbContainer = sidebarItem.find('.vq-book-item-thumb');
+                    
+                    if (thumbContainer.length) {
+                        thumbContainer.html(`<img src="${newUrl}">`);
                     }
+                    
+                    console.log("Cover updated successfully:", newUrl);
+                } else {
+                    alert('Error: ' + response.data);
                 }
+            },
+            error: function(xhr, status, error) {
+                btn.text('Cover');
+                alert('Upload failed: ' + error);
             }
         });
     });
@@ -585,7 +605,7 @@ jQuery(document).ready(function($) {
         list.find('.vq-no-chapters').remove();
 
         const badge = storage === 'local' 
-            ? '<span class="vq-badge vq-badge-local">LOCAL</span> <button class="vq-sync-btn" title="Sync to Cloudflare R2" data-key="'+track.key+'">↑</button>' 
+            ? '<span class="vq-badge vq-badge-local">LOCAL</span> <button class="vq-chapter-edit" title="Edit Audio" data-key="'+track.key+'"><span class="material-symbols-outlined">graphic_eq</span></button> <button class="vq-sync-btn" title="Sync to Cloudflare R2" data-key="'+track.key+'"><span class="material-symbols-outlined">cloud_upload</span></button>' 
             : '<span class="vq-badge vq-badge-r2">R2</span>';
 
         const item = `
@@ -594,12 +614,167 @@ jQuery(document).ready(function($) {
                 <input type="text" class="vq-chapter-title" value="${track.title}" placeholder="Chapter Title">
                 <div class="vq-chapter-actions">
                     ${badge}
-                    <button class="vq-inline-play" data-key="${track.key}" data-storage="${storage}">▶</button>
-                    <button class="vq-remove-track">×</button>
+                    <button class="vq-inline-play" data-key="${track.key}" data-storage="${storage}"><span class="material-symbols-outlined">play_circle</span></button>
+                    <button class="vq-remove-track"><span class="material-symbols-outlined">delete_forever</span></button>
                 </div>
             </li>
         `;
         list.append(item);
         savePlaylist(list.data('id'));
     }
+    // --- Chapter Title Auto-save ---
+    $(document).on('change', '.vq-chapter-title', function() {
+        const list = $(this).closest('.vq-chapters-list');
+        const bookId = list.data('id');
+        console.log("Title changed, saving playlist for book:", bookId);
+        savePlaylist(bookId);
+    });
+
+    $(document).on('keypress', '.vq-chapter-title', function(e) {
+        if (e.which === 13) { // Enter
+            $(this).blur();
+        }
+    });
+
+    // --- Synced from Waveform Event ---
+    $(document).on('voiceqwen_audio_synced', function(e, relPath) {
+        console.log("Audio synced from waveform:", relPath);
+        // Refresh the active book view if it's open
+        const activeCard = $('.vq-card:visible');
+        if (activeCard.length) {
+            const postId = activeCard.data('id');
+            if (postId) {
+                // We can just trigger a re-load of the editor to refresh badges
+                $.post(voiceqwen_ajax.url, {
+                    action: 'vq_get_book_editor',
+                    nonce: voiceqwen_ajax.nonce,
+                    post_id: postId
+                }, function(response) {
+                    if (response.success) {
+                        $('.audiobook-editor-column').html(response.data);
+                        // Re-init sortable
+                        const listEl = $('.vq-chapters-list.sortable')[0];
+                        if (listEl) {
+                            new Sortable(listEl, {
+                                handle: '.vq-drag-handle',
+                                animation: 150,
+                                onEnd: function() { savePlaylist(postId); }
+                            });
+                        }
+                    }
+                });
+            }
+        }
+    });
+    // --- Export Audiobook ---
+    $(document).on('click', '.vq-export-book-btn', function(e) {
+        e.stopPropagation();
+        const postId = $(this).data('id');
+        const btn = $(this);
+        const originalText = btn.text();
+        
+        btn.text('EXPORTING...').prop('disabled', true);
+
+        $.ajax({
+            url: voiceqwen_ajax.url,
+            type: 'POST',
+            data: {
+                action: 'vq_export_audiobook',
+                nonce: voiceqwen_ajax.nonce,
+                post_id: postId
+            },
+            success: function(response) {
+                btn.text(originalText).prop('disabled', false);
+                if (response.success) {
+                    const data = response.data;
+                    const fileName = (data.title || 'audiobook').toLowerCase().replace(/[^a-z0-9]/g, '-') + '.json';
+                    const jsonStr = JSON.stringify(data, null, 4);
+                    
+                    const blob = new Blob([jsonStr], { type: 'application/json' });
+                    const url = URL.createObjectURL(blob);
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.download = fileName;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    URL.revokeObjectURL(url);
+                } else {
+                    alert('Export failed: ' + response.data);
+                }
+            }
+        });
+    });
+
+    // --- Import Audiobook ---
+    $('#vq-import-book-btn').on('click', function() {
+        $('#vq-import-file-input').click();
+    });
+
+    $('#vq-import-file-input').on('change', function() {
+        const file = this.files[0];
+        if (!file) return;
+
+        const formData = new FormData();
+        formData.append('action', 'vq_import_audiobook');
+        formData.append('nonce', voiceqwen_ajax.nonce);
+        formData.append('file', file);
+
+        const btn = $('#vq-import-book-btn');
+        const originalText = btn.text();
+        btn.text('IMPORTING...').prop('disabled', true);
+
+        $.ajax({
+            url: voiceqwen_ajax.url,
+            type: 'POST',
+            data: formData,
+            processData: false,
+            contentType: false,
+            success: function(response) {
+                btn.text(originalText).prop('disabled', false);
+                if (response.success) {
+                    alert('Audiobook imported successfully!');
+                    location.reload(); // Refresh to show new book
+                } else {
+                    alert('Import failed: ' + response.data);
+                }
+            }
+        });
+        
+        this.value = ''; // Reset input
+        // --- Download from R2 to Local ---
+    $(document).on('click', '.vq-download-from-r2', function(e) {
+        e.stopPropagation();
+        const btn = $(this);
+        const key = btn.data('key');
+        const card = btn.closest('.vq-card');
+        const postId = card.data('id');
+        
+        const originalIcon = btn.html();
+        btn.html('<span class="material-symbols-outlined vq-spin">sync</span>').prop('disabled', true);
+
+        $.ajax({
+            url: voiceqwen_ajax.url,
+            type: 'POST',
+            data: {
+                action: 'vq_download_from_r2',
+                nonce: voiceqwen_ajax.nonce,
+                key: key,
+                post_id: postId
+            },
+            success: function(response) {
+                if (response.success) {
+                    // Refresh book editor to show edit button
+                    btn.closest('.vq-book-item').click();
+                    setTimeout(() => {
+                        $(`.vq-book-item[data-id="${postId}"]`).click();
+                    }, 100);
+                } else {
+                    btn.html(originalIcon).prop('disabled', false);
+                    alert('Download failed: ' + response.data);
+                }
+            }
+        });
+    });
+});
 });

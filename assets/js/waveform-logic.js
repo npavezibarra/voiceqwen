@@ -8,6 +8,7 @@ window.VoiceQwen = window.VoiceQwen || {};
 (function($) {
     // Shared State
     window.VoiceQwen.activeAudioBuffer = null;
+    window.VoiceQwen.copiedAudioBuffer = null;
     window.VoiceQwen.waveUndoStack = [];
     window.VoiceQwen.audioCtx = null;
 
@@ -80,6 +81,29 @@ window.VoiceQwen = window.VoiceQwen || {};
             const origChan = orig.getChannelData(i);
             chan.set(origChan.subarray(0, frameStart));
             chan.set(origChan.subarray(frameEnd), frameStart);
+        }
+        return newBuffer;
+    };
+
+    /**
+     * Extracts a segment from an AudioBuffer
+     */
+    window.VoiceQwen.extractSegment = function(orig, start, end) {
+        if (!orig) return null;
+        
+        const sampleRate = orig.sampleRate;
+        const frameStart = Math.floor(start * sampleRate);
+        const frameEnd = Math.floor(end * sampleRate);
+        const length = frameEnd - frameStart;
+        
+        if (length <= 0) return null;
+
+        const newBuffer = window.VoiceQwen.getAudioCtx().createBuffer(orig.numberOfChannels, length, sampleRate);
+
+        for (let i = 0; i < orig.numberOfChannels; i++) {
+            const chan = newBuffer.getChannelData(i);
+            const origChan = orig.getChannelData(i);
+            chan.set(origChan.subarray(frameStart, frameEnd));
         }
         return newBuffer;
     };
