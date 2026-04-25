@@ -535,6 +535,47 @@ jQuery(document).ready(function($) {
         });
     });
 
+    $(document).on('click', '.vq-upload-background-btn', function() {
+        $(this).siblings('.vq-background-uploader').click();
+    });
+
+    $(document).on('change', '.vq-background-uploader', function(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const card = $(this).closest('.vq-card');
+        const bookId = card.data('id');
+        const btn = card.find('.vq-upload-background-btn');
+
+        const formData = new FormData();
+        formData.append('action', 'vq_upload_background');
+        formData.append('nonce', voiceqwen_ajax.nonce);
+        formData.append('post_id', bookId);
+        formData.append('file', file);
+
+        btn.text('Uploading...');
+
+        $.ajax({
+            url: voiceqwen_ajax.url,
+            type: 'POST',
+            data: formData,
+            processData: false,
+            contentType: false,
+            success: function(response) {
+                btn.text('FONDO');
+                if (response.success) {
+                    alert('Background updated successfully!');
+                } else {
+                    alert('Error: ' + response.data);
+                }
+            },
+            error: function(xhr, status, error) {
+                btn.text('FONDO');
+                alert('Upload failed: ' + error);
+            }
+        });
+    });
+
     $(document).on('change', '.vq-hidden-uploader', function(e) {
         const files = e.target.files;
         if (!files.length) return;

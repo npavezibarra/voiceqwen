@@ -23,6 +23,7 @@ class AudiobookManager
             'vq_upload_chapter',
             'vq_get_book_editor',
             'vq_upload_cover',
+            'vq_upload_background',
             'vq_get_track_url',
             'vq_get_books',
             'vq_upload_local_chapter',
@@ -34,6 +35,9 @@ class AudiobookManager
 
         foreach ($actions as $action) {
             add_action('wp_ajax_' . $action, array(self::class, 'ajax_' . str_replace('vq_', '', $action)));
+            if ($action === 'vq_get_track_url') {
+                add_action('wp_ajax_nopriv_' . $action, array(self::class, 'ajax_' . str_replace('vq_', '', $action)));
+            }
         }
     }
 
@@ -43,6 +47,20 @@ class AudiobookManager
     public static function get_cover_url($post_id): string
     {
         $key = get_post_meta($post_id, '_vq_cover_key', true);
+        if (!$key) {
+            return '';
+        }
+
+        $upload_dir = wp_upload_dir();
+        return $upload_dir['baseurl'] . '/voiceqwen-audiobook/' . $key;
+    }
+
+    /**
+     * Get background URL for a post.
+     */
+    public static function get_background_url($post_id): string
+    {
+        $key = get_post_meta($post_id, '_vq_background_key', true);
         if (!$key) {
             return '';
         }
@@ -166,6 +184,11 @@ class AudiobookManager
                         Cover
                     </button>
                     <input type="file" class="vq-cover-uploader" style="display:none;" accept="image/*">
+
+                    <button class="nav-btn vq-upload-background-btn" data-id="<?php echo $post->ID; ?>">
+                        FONDO
+                    </button>
+                    <input type="file" class="vq-background-uploader" style="display:none;" accept="image/*">
                     
                     <button class="nav-btn vq-export-book-btn" data-id="<?php echo $post->ID; ?>" title="Download book data for import">
                         EXPORT
@@ -446,8 +469,6 @@ class AudiobookManager
         }
 
         $file = $_FILES['file'];
-        $mode = get_option('voiceqwen_storage_mode', 'local');
-
         $optimized = CoverOptimizer::optimize_to_jpeg($file['tmp_name'], 614400, 1000);
         if (!empty($optimized['error'])) {
             wp_send_json_error('Cover optimization failed: ' . $optimized['error']);
@@ -463,7 +484,7 @@ class AudiobookManager
         $abs_dir = dirname($abs);
         
         if (!wp_mkdir_p($abs_dir)) {
-            wp_send_json_error('Failed to create covers directory: ' . $abs_dir);
+            wp_send_json_error('Failed to create covers directory');
         }
 
         if (@copy($optimized_path, $abs)) {
@@ -471,7 +492,43 @@ class AudiobookManager
             @unlink($optimized_path);
             wp_send_json_success(self::get_cover_url($post_id));
         } else {
-            wp_send_json_error('Failed to copy optimized image to destination: ' . $abs);
+            wp_send_json_error('Failed to copy optimized image');
+        }
+    }
+
+    public static function ajax_upload_background(): void
+    {
+        check_ajax_referer('voiceqwen_nonce', 'nonce');
+        $post_id = intval($_POST['post_id']);
+        if (empty($_FILES['file'])) {
+            wp_send_json_error('No file provided');
+        }
+
+        $file = $_FILES['file'];
+        $optimized = CoverOptimizer::optimize_background($file['tmp_name'], 614400);
+        if (!empty($optimized['error'])) {
+            wp_send_json_error('Background optimization failed: ' . $optimized['error']);
+        }
+        $optimized_path = $optimized['path'];
+
+        $stamp = time();
+        $key = 'backgrounds/' . $post_id . '_' . $stamp . '.jpg';
+
+        $upload_dir = wp_upload_dir();
+        $base_dir = rtrim($upload_dir['basedir'], '/') . '/voiceqwen-audiobook';
+        $abs = $base_dir . '/' . $key;
+        $abs_dir = dirname($abs);
+        
+        if (!wp_mkdir_p($abs_dir)) {
+            wp_send_json_error('Failed to create backgrounds directory');
+        }
+
+        if (@copy($optimized_path, $abs)) {
+            update_post_meta($post_id, '_vq_background_key', $key);
+            @unlink($optimized_path);
+            wp_send_json_success(self::get_background_url($post_id));
+        } else {
+            wp_send_json_error('Failed to copy optimized image');
         }
     }
 
@@ -524,6 +581,8 @@ class AudiobookManager
         $storage = isset($_POST['storage']) ? sanitize_text_field($_POST['storage']) : 'r2';
         $post_id = isset($_POST['post_id']) ? intval($_POST['post_id']) : 0;
 
+        error_log("VoiceQwen Shop: Requesting URL for Key: $key, Storage: $storage, Post ID: $post_id");
+
         if (!$key) {
             wp_send_json_error('No track key provided');
         }
@@ -554,18 +613,23 @@ class AudiobookManager
             
             if (file_exists($abs)) {
                 $v = @filemtime($abs) ?: time();
+                error_log("VoiceQwen Shop: Found local file: $abs");
                 wp_send_json_success($base_voiceqwen_url . $rel_path . '?v=' . $v);
+            } else {
+                error_log("VoiceQwen Shop: Local file NOT found: $abs");
             }
         }
 
         // R2 Mode (Default)
+        error_log("VoiceQwen Shop: Trying R2 for Key: $key");
         $r2 = new R2Client();
         $url = $r2->get_presigned_url($key, '+1 hour');
         if ($url) {
+            error_log("VoiceQwen Shop: Generated R2 URL: " . substr($url, 0, 100) . "...");
             wp_send_json_success($url);
         }
         
-        wp_send_json_error('Failed to generate URL');
+        error_log("VoiceQwen Shop: FAILED to generate R2 URL for Key: $key");
     }
     public static function ajax_upload_local_chapter(): void
     {

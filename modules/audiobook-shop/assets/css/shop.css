@@ -1,0 +1,39 @@
+/* Audiobook Shop Minimalist Styles */
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
+
+.shop-body { 
+    font-family: 'Poppins', sans-serif; 
+}
+
+.hide-scrollbar::-webkit-scrollbar { 
+    display: none; 
+}
+
+.hide-scrollbar { 
+    -ms-overflow-style: none; 
+    scrollbar-width: none; 
+}
+
+@keyframes bounce-custom {
+    0%, 100% { transform: scaleY(0.5); }
+    50% { transform: scaleY(1.2); }
+}
+
+.animate-bounce-custom {
+    animation: bounce-custom 1s infinite;
+}
+
+/* Transitions */
+.view-transition {
+    transition: all 0.5s ease-in-out;
+}
+
+/* Bottom Sheet / Drawer */
+.bottom-sheet {
+    transform: translateY(100%);
+    transition: transform 0.5s cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+.bottom-sheet.active {
+    transform: translateY(0);
+}

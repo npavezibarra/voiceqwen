@@ -19,6 +19,7 @@ require_once plugin_dir_path( __FILE__ ) . 'includes/ajax-meta.php';
 require_once plugin_dir_path( __FILE__ ) . 'includes/ajax-markers.php';
 require_once plugin_dir_path( __FILE__ ) . 'includes/class-voiceqwen-audio-analyzer.php';
 require_once plugin_dir_path( __FILE__ ) . 'modules/audiobook/audiobook.php';
+require_once plugin_dir_path( __FILE__ ) . 'modules/audiobook-shop/audiobook-shop.php';
 
 // 2. Custom Template Loader
 // 2. Custom Template Loader
@@ -34,6 +35,15 @@ function voiceqwen_custom_template( $template ) {
     $audi_slug = get_option('voiceqwen_audiobook_page_slug', 'audi');
     if ( is_page( $audi_slug ) ) {
         $custom_template = plugin_dir_path( __FILE__ ) . 'templates/audi-template.php';
+        if ( file_exists( $custom_template ) ) {
+            return $custom_template;
+        }
+    }
+
+    // Dynamic Shop Page
+    $shop_slug = get_option('voiceqwen_shop_page_slug', 'audiobook-shop');
+    if ( is_page( $shop_slug ) ) {
+        $custom_template = plugin_dir_path( __FILE__ ) . 'templates/shop-template.php';
         if ( file_exists( $custom_template ) ) {
             return $custom_template;
         }
@@ -66,6 +76,10 @@ function voiceqwen_enqueue_assets() {
 
     wp_enqueue_script( 'voiceqwen-audiobook', plugins_url( 'modules/audiobook/audiobook.js', __FILE__ ), array( 'voiceqwen-core' ), '1.0', true );
     wp_enqueue_script( 'voiceqwen-audiobook-author', plugins_url( 'modules/audiobook/audiobook-author.js', __FILE__ ), array( 'voiceqwen-audiobook' ), '1.0', true );
+    
+    // Shop Assets
+    wp_enqueue_style( 'voiceqwen-shop', plugins_url( 'modules/audiobook-shop/assets/css/shop.css', __FILE__ ) );
+    wp_enqueue_script( 'voiceqwen-shop', plugins_url( 'modules/audiobook-shop/assets/js/shop.js', __FILE__ ), array( 'voiceqwen-core' ), '1.0', true );
     
     $upload_dir = wp_upload_dir();
     $current_user = wp_get_current_user();
@@ -202,6 +216,11 @@ function voiceqwen_remove_from_menu( $page_id_or_title ) {
                         $current_page_meta = get_posts(array('post_type' => 'page', 'meta_key' => '_vq_page_type', 'meta_value' => 'audiobook', 'posts_per_page' => 1));
                         $current_id = $current_page_meta ? $current_page_meta[0]->ID : 0;
                         if ($item->object_id == $current_id && get_option('voiceqwen_audiobook_show_in_menu', 'yes') === 'yes') continue;
+                        
+                        $shop_page_meta = get_posts(array('post_type' => 'page', 'meta_key' => '_vq_page_type', 'meta_value' => 'audiobook_shop', 'posts_per_page' => 1));
+                        $shop_id = $shop_page_meta ? $shop_page_meta[0]->ID : 0;
+                        if ($item->object_id == $shop_id && get_option('voiceqwen_shop_show_in_menu', 'yes') === 'yes') continue;
+
                         wp_delete_post($item->ID, true);
                     }
                 }
@@ -238,9 +257,13 @@ function voiceqwen_remove_from_menu( $page_id_or_title ) {
             $label = isset($attrs['label']) ? $attrs['label'] : '';
             $id = isset($attrs['id']) ? $attrs['id'] : 0;
 
-            if (strcasecmp($label, 'Audi') === 0 || strcasecmp($label, 'Temu') === 0 || strcasecmp($label, 'Audiobook') === 0) {
+            if (strcasecmp($label, 'Audi') === 0 || strcasecmp($label, 'Temu') === 0 || strcasecmp($label, 'Audiobook') === 0 || strcasecmp($label, 'Shop') === 0 || strcasecmp($label, 'Librería') === 0) {
                 // Keep ONLY if it's our current official ID AND we want it shown
-                if ($id == $current_id && $show_in_menu === 'yes') {
+                $shop_page_meta = get_posts(array('post_type' => 'page', 'meta_key' => '_vq_page_type', 'meta_value' => 'audiobook_shop', 'posts_per_page' => 1));
+                $shop_id = $shop_page_meta ? $shop_page_meta[0]->ID : 0;
+                $show_shop_in_menu = get_option('voiceqwen_shop_show_in_menu', 'yes');
+
+                if (($id == $current_id && $show_in_menu === 'yes') || ($id == $shop_id && $show_shop_in_menu === 'yes')) {
                     return $matches[0];
                 }
                 return ''; // KILL
@@ -301,14 +324,28 @@ function voiceqwen_ensure_pages() {
     ));
     $main_page = $existing_audiobook_pages ? $existing_audiobook_pages[0] : null;
 
+    $existing_shop_pages = get_posts(array(
+        'post_type' => 'page', 
+        'meta_key' => '_vq_page_type', 
+        'meta_value' => 'audiobook_shop', 
+        'posts_per_page' => 1,
+        'post_status' => 'publish'
+    ));
+    $shop_page = $existing_shop_pages ? $existing_shop_pages[0] : null;
+
+    $shop_title = get_option('voiceqwen_shop_page_name', 'Audiobook Shop');
+    $shop_slug = get_option('voiceqwen_shop_page_slug', 'audiobook-shop');
+    $show_shop_in_menu = get_option('voiceqwen_shop_show_in_menu', 'yes');
+
     $pages = array(
         'voice'    => 'LOCUTOR',
-        'audi_dyn' => $audi_title
+        'audi_dyn' => $audi_title,
+        'shop_dyn' => $shop_title
     );
 
     foreach ( $pages as $key => $title ) {
-        $slug = ($key === 'voice') ? 'voice' : $audi_slug;
-        $page = ($key === 'voice') ? get_page_by_path('voice') : $main_page;
+        $slug = ($key === 'voice') ? 'voice' : (($key === 'audi_dyn') ? $audi_slug : $shop_slug);
+        $page = ($key === 'voice') ? get_page_by_path('voice') : (($key === 'audi_dyn') ? $main_page : $shop_page);
 
         if ( ! $page ) {
             $page_id = wp_insert_post( array(
@@ -318,10 +355,12 @@ function voiceqwen_ensure_pages() {
                 'post_type'    => 'page',
                 'post_name'    => $slug,
             ) );
-            if ($key !== 'voice') {
+            if ($key === 'audi_dyn') {
                 update_post_meta($page_id, '_vq_page_type', 'audiobook');
+            } elseif ($key === 'shop_dyn') {
+                update_post_meta($page_id, '_vq_page_type', 'audiobook_shop');
             }
-            if ( $key === 'voice' || ($key === 'audi_dyn' && $show_in_menu === 'yes') ) {
+            if ( $key === 'voice' || ($key === 'audi_dyn' && $show_in_menu === 'yes') || ($key === 'shop_dyn' && $show_shop_in_menu === 'yes') ) {
                 voiceqwen_add_to_menu( $page_id );
             }
         } else {
@@ -336,6 +375,12 @@ function voiceqwen_ensure_pages() {
             
             if ($key === 'audi_dyn') {
                 if ($show_in_menu === 'yes') {
+                    voiceqwen_add_to_menu($page->ID);
+                } else {
+                    voiceqwen_remove_from_menu($page->ID);
+                }
+            } elseif ($key === 'shop_dyn') {
+                if ($show_shop_in_menu === 'yes') {
                     voiceqwen_add_to_menu($page->ID);
                 } else {
                     voiceqwen_remove_from_menu($page->ID);
@@ -365,6 +410,9 @@ function voiceqwen_render_settings_page() {
         $new_name = sanitize_text_field($_POST['audiobook_page_name']);
         $old_name = get_option('voiceqwen_audiobook_page_name', 'Audi');
         
+        $new_shop_name = sanitize_text_field($_POST['shop_page_name']);
+        $old_shop_name = get_option('voiceqwen_shop_page_name', 'Audiobook Shop');
+
         update_option('voiceqwen_storage_mode', sanitize_text_field($_POST['storage_mode']));
         update_option('voiceqwen_r2_account_id', sanitize_text_field($_POST['r2_account_id']));
         update_option('voiceqwen_r2_access_key', sanitize_text_field($_POST['r2_access_key']));
@@ -374,9 +422,17 @@ function voiceqwen_render_settings_page() {
         $show_in_menu = isset($_POST['show_in_menu']) ? 'yes' : 'no';
         update_option('voiceqwen_audiobook_show_in_menu', $show_in_menu);
 
+        $show_shop_in_menu = isset($_POST['show_shop_in_menu']) ? 'yes' : 'no';
+        update_option('voiceqwen_shop_show_in_menu', $show_shop_in_menu);
+
         if ($new_name !== $old_name) {
             update_option('voiceqwen_audiobook_page_name', $new_name);
             update_option('voiceqwen_audiobook_page_slug', sanitize_title($new_name));
+        }
+
+        if ($new_shop_name !== $old_shop_name) {
+            update_option('voiceqwen_shop_page_name', $new_shop_name);
+            update_option('voiceqwen_shop_page_slug', sanitize_title($new_shop_name));
         }
         
         voiceqwen_ensure_pages();
@@ -414,10 +470,34 @@ function voiceqwen_render_settings_page() {
                     </td>
                 </tr>
                 <tr>
-                    <th scope="row">Menu Visibility</th>
+                    <th scope="row">Menu Visibility (Manager)</th>
                     <td>
                         <label>
                             <input type="checkbox" name="show_in_menu" value="yes" <?php checked(get_option('voiceqwen_audiobook_show_in_menu', 'yes'), 'yes'); ?>>
+                            Show in main menu
+                        </label>
+                    </td>
+                </tr>
+                <tr>
+                    <th scope="row"><label for="shop_page_name">Audiobook Shop Page Name</label></th>
+                    <td>
+                        <?php 
+                        $shop_name = get_option('voiceqwen_shop_page_name', 'Audiobook Shop');
+                        $existing_shop = get_posts(array('post_type' => 'page', 'meta_key' => '_vq_page_type', 'meta_value' => 'audiobook_shop', 'posts_per_page' => 1));
+                        $shop_url = $existing_shop ? get_permalink($existing_shop[0]->ID) : home_url(get_option('voiceqwen_shop_page_slug', 'audiobook-shop'));
+                        ?>
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <input name="shop_page_name" type="text" id="shop_page_name" value="<?php echo esc_attr($shop_name); ?>" class="regular-text">
+                            <a href="<?php echo esc_url($shop_url); ?>" class="button button-primary" target="_blank">GO TO PAGE</a>
+                        </div>
+                        <p class="description">This name will be used to create the Shop page and its URL slug.</p>
+                    </td>
+                </tr>
+                <tr>
+                    <th scope="row">Menu Visibility (Shop)</th>
+                    <td>
+                        <label>
+                            <input type="checkbox" name="show_shop_in_menu" value="yes" <?php checked(get_option('voiceqwen_shop_show_in_menu', 'yes'), 'yes'); ?>>
                             Show in main menu
                         </label>
                     </td>

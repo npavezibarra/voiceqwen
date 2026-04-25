@@ -263,7 +263,23 @@
 
 .vq-card-actions {
     display: flex;
-    gap: 10px;
+    flex-direction: column;
+    gap: 8px;
+    min-width: 140px;
+}
+
+.vq-card-actions .nav-btn,
+.vq-card-actions .vq-dropdown-wrap,
+.vq-card-actions .vq-dropdown-wrap .nav-btn {
+    width: 100% !important;
+    display: block !important;
+    text-align: center;
+}
+
+.vq-card-actions .nav-btn {
+    padding: 6px 12px !important;
+    font-size: 10px !important;
+    letter-spacing: 0.5px;
 }
 
 /* Playlist / Chapters */
