@@ -36,12 +36,12 @@
                 <!-- Overlay to darken background slightly -->
                 <div class="absolute inset-0 z-1 bg-black/40"></div>
 
-                <div class="relative z-10 flex-1 flex flex-col md:flex-row gap-8 px-8 py-4 md:px-12 md:py-12 h-full w-full">
+                <div class="relative z-10 flex-1 flex flex-col md:flex-row gap-8 px-8 py-4 md:px-12 md:py-12 h-full w-full max-w-[1026px] mx-auto">
                     
                     <!-- Left Column: Player Card -->
-                    <div class="w-full md:w-3/5 flex flex-col">
+                    <div class="w-full md:w-1/2 flex flex-col">
 
-                    <div class="bg-white/10 backdrop-blur-xl border border-white/10 rounded-[6px] p-8 flex flex-col md:flex-row gap-8 shadow-2xl">
+                    <div class="bg-white/10 backdrop-blur-xl border border-white/10 rounded-[6px] p-[10px] md:p-8 flex flex-col md:flex-row gap-8 shadow-2xl">
                         <!-- Cover inside card -->
                         <div class="w-full md:w-48 aspect-square bg-zinc-800 rounded-[6px] overflow-hidden shadow-2xl flex-shrink-0 border border-white/10">
                             <img id="player-cover" src="" alt="Cover" class="w-full h-full object-cover">
@@ -49,7 +49,7 @@
 
                         <!-- Info & Controls inside card -->
                         <div class="flex-1 flex flex-col justify-center">
-                            <div class="mb-6">
+                            <div class="mb-6 text-center md:text-left flex flex-col items-center md:items-start">
                                 <h2 id="player-title" class="text-2xl font-black uppercase tracking-tight mb-1 leading-none text-white">Título</h2>
                                 <p id="player-author" class="text-xs text-white/60 uppercase tracking-[0.2em]">Autor</p>
                             </div>
@@ -100,13 +100,25 @@
                 </div>
 
                 <!-- Right Column: Chapters List (Desktop) -->
-                <div class="flex max-md:hidden w-full md:w-2/5 flex-col bg-white/10 backdrop-blur-xl border border-white/10 rounded-[6px] shadow-2xl overflow-hidden">
+                <div id="chapters-container-desktop" class="flex max-md:hidden w-full md:w-1/2 flex-col bg-white/10 backdrop-blur-xl border border-white/10 rounded-[6px] shadow-2xl overflow-hidden relative">
                     <div class="flex justify-between items-center p-6 border-b border-white/5 bg-white/5">
                         <h3 class="text-xs font-black uppercase tracking-[0.2em] text-white/70">Capítulos</h3>
                         <span id="chapter-count" class="text-[10px] font-bold text-white/40 uppercase">0 Tracks</span>
                     </div>
                     <div id="desktop-chapters-list" class="flex-1 overflow-y-auto space-y-1 p-4 max-h-[600px] hide-scrollbar">
                         <!-- Lista de capítulos vía JS -->
+                    </div>
+
+                    <!-- Lock Overlay (Desktop) -->
+                    <div id="desktop-lock-overlay" class="hidden absolute inset-0 bg-zinc-950/80 backdrop-blur-md z-20 flex flex-col items-center justify-center p-8 text-center">
+                        <div class="w-16 h-16 bg-white/10 rounded-full flex items-center justify-center mb-6 border border-white/20">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-lock text-white/40"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                        </div>
+                        <h4 class="text-white text-lg font-black uppercase tracking-widest mb-2">Contenido Bloqueado</h4>
+                        <p class="text-white/60 text-xs mb-8 uppercase tracking-widest">Compra este audiolibro para desbloquear todas las pistas</p>
+                        <button id="desktop-buy-btn" class="px-8 py-4 bg-white text-black text-xs font-black uppercase tracking-[0.2em] rounded-[6px] hover:scale-105 transition-all shadow-2xl">
+                            COMPRAR <span class="ml-2 opacity-40 price-tag"></span>
+                        </button>
                     </div>
                 </div>
             </div>
@@ -116,8 +128,20 @@
         <div id="overlay" onclick="closeChapters()" class="hidden fixed inset-0 bg-black/40 z-[60] transition-opacity opacity-0 backdrop-blur-sm lg:hidden"></div>
         <div id="bottom-sheet" class="bottom-sheet fixed bottom-0 left-0 right-0 lg:hidden bg-zinc-950/80 backdrop-blur-2xl z-[70] p-10 shadow-2xl flex flex-col rounded-t-[2rem] border-t border-white/10 max-h-[80vh]">
             <div class="w-12 h-1 bg-zinc-800 rounded-full mx-auto mb-10"></div>
-            <div id="mobile-chapters-list" class="flex-1 overflow-y-auto space-y-3 pr-2 hide-scrollbar">
+            <div id="mobile-chapters-list" class="flex-1 overflow-y-auto space-y-3 pr-2 hide-scrollbar relative min-h-[300px]">
                 <!-- Lista de capítulos vía JS -->
+            </div>
+            
+            <!-- Lock Overlay (Mobile) -->
+            <div id="mobile-lock-overlay" class="hidden absolute inset-0 bg-zinc-950/80 backdrop-blur-md z-20 flex flex-col items-center justify-center p-8 text-center rounded-t-[2rem]">
+                <div class="w-12 h-12 bg-white/10 rounded-full flex items-center justify-center mb-4 border border-white/20">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-lock text-white/40"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                </div>
+                <h4 class="text-white text-base font-black uppercase tracking-widest mb-1">Bloqueado</h4>
+                <p class="text-white/60 text-[10px] mb-6 uppercase tracking-widest">Compra para desbloquear</p>
+                <button id="mobile-buy-btn" class="px-6 py-3 bg-white text-black text-[10px] font-black uppercase tracking-[0.2em] rounded-[6px] shadow-2xl">
+                    COMPRAR <span class="ml-2 opacity-40 price-tag"></span>
+                </button>
             </div>
         </div>
 

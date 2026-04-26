@@ -277,7 +277,7 @@ class AudiobookManager
                                 }
                             }
                         ?>
-                            <li class="vq-chapter-item" data-key="<?php echo esc_attr($track['key']); ?>">
+                            <li class="vq-chapter-item" data-key="<?php echo esc_attr($track['key']); ?>" data-duration="<?php echo esc_attr($track['duration'] ?? '00:00'); ?>">
                                 <span class="vq-drag-handle">≡</span>
                                 <input type="text" class="vq-chapter-title" value="<?php echo esc_attr($track['title']); ?>" placeholder="Chapter Title">
                                 <div class="vq-chapter-actions">
@@ -450,6 +450,7 @@ class AudiobookManager
                 'id' => uniqid(),
                 'title' => $beautiful_title,
                 'key' => $r2_key,
+                'duration' => self::get_wav_duration_formatted($file['tmp_name']),
                 'r2_size' => filesize($file['tmp_name']) // Store size for diffing
             );
             
@@ -941,5 +942,65 @@ class AudiobookManager
         } else {
             wp_send_json_error('Failed to save file locally');
         }
+    }
+    /**
+     * Helper to get WAV duration in "MM:SS" format.
+     */
+    public static function get_wav_duration_formatted($file_path): string {
+        $seconds = self::get_wav_duration($file_path);
+        if ($seconds <= 0) return '00:00';
+        
+        $mins = floor($seconds / 60);
+        $secs = floor($seconds % 60);
+        return sprintf('%02d:%02d', $mins, $secs);
+    }
+
+    /**
+     * Helper to read WAV header and calculate duration in seconds.
+     */
+    public static function get_wav_duration($file): float {
+        if (!file_exists($file) || !is_readable($file)) return 0;
+        
+        $fp = fopen($file, 'r');
+        if (!$fp) return 0;
+        
+        // Read RIFF header
+        $header = fread($fp, 12);
+        if (substr($header, 0, 4) !== 'RIFF' || substr($header, 8, 4) !== 'WAVE') {
+            fclose($fp);
+            return 0;
+        }
+
+        $duration = 0;
+        $bytes_per_sec = 0;
+        while (!feof($fp)) {
+            $chunk_header = fread($fp, 8);
+            if (strlen($chunk_header) < 8) break;
+            
+            $chunk_id = substr($chunk_header, 0, 4);
+            $chunk_size_raw = substr($chunk_header, 4, 4);
+            $chunk_size_arr = unpack('V', $chunk_size_raw);
+            $chunk_size = $chunk_size_arr[1];
+
+            if ($chunk_id === 'fmt ') {
+                $fmt_data = fread($fp, $chunk_size);
+                $fmt = unpack('vformat/vchannels/Vsamplerate/Vbytespersec/vblockalign/vbitspersample', substr($fmt_data, 0, 16));
+                $bytes_per_sec = $fmt['bytespersec'];
+            } elseif ($chunk_id === 'data') {
+                if ($bytes_per_sec > 0) {
+                    $duration = $chunk_size / $bytes_per_sec;
+                }
+                fseek($fp, $chunk_size, SEEK_CUR);
+            } else {
+                fseek($fp, $chunk_size, SEEK_CUR);
+            }
+            
+            if ($chunk_size % 2 !== 0) {
+                fseek($fp, 1, SEEK_CUR);
+            }
+        }
+        
+        fclose($fp);
+        return (float)$duration;
     }
 }

@@ -239,6 +239,7 @@ jQuery(document).ready(function($) {
             playlist.push({
                 title: item.find('.vq-chapter-title').val(),
                 key: item.data('key'),
+                duration: item.attr('data-duration') || '00:00',
                 storage: item.find('.vq-inline-play').data('storage') || 'r2'
             });
         });
@@ -331,7 +332,16 @@ jQuery(document).ready(function($) {
                     activeWavesurfer.on('ready', () => {
                         activeWavesurfer.play();
                         btn.text('⏸').addClass('loaded');
+                        
+                        const total = formatTime(activeWavesurfer.getDuration());
                         updateTime(activeWavesurfer, playerContainer);
+                        
+                        // Save duration if it was 00:00
+                        const item = btn.closest('.vq-chapter-item');
+                        if (item.attr('data-duration') === '00:00' || !item.attr('data-duration')) {
+                            item.attr('data-duration', total);
+                            savePlaylist(postId);
+                        }
                     });
 
                     activeWavesurfer.on('play', () => btn.text('⏸'));

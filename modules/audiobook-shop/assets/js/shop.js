@@ -58,7 +58,7 @@ function renderLibrary() {
     }
 
     grid.innerHTML = BOOKS.map(book => `
-        <div class="flex flex-col gap-5 group cursor-pointer" onclick="openPlayer(${book.id})">
+        <div class="flex flex-col gap-5 group cursor-pointer" onclick="openBook(${book.id})">
             <div class="relative aspect-square bg-zinc-50 overflow-hidden rounded-[6px] border border-zinc-100 shadow-sm group-hover:shadow-xl transition-all duration-500">
                 <img src="${book.cover}" alt="${book.title}" class="w-full h-full object-cover grayscale-[0.2] brightness-95 group-hover:grayscale-0 group-hover:scale-105 transition-all duration-700">
                 <div class="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors"></div>
@@ -75,22 +75,19 @@ function renderLibrary() {
     if (window.lucide) lucide.createIcons();
 }
 
-window.openPlayer = function(bookId) {
-    selectedBook = BOOKS.find(b => b.id === bookId);
+window.openBook = function(id) {
+    selectedBook = BOOKS.find(b => b.id == id);
     if (!selectedBook) return;
-    
+
     currentChapter = 0;
-    isPlaying = false;
-    if (audioPlayer) audioPlayer.pause();
-    
+    document.getElementById('library-view').classList.add('hidden');
+    document.getElementById('player-view').classList.remove('hidden');
+
     document.getElementById('player-cover').src = selectedBook.cover;
     document.getElementById('player-title').innerText = selectedBook.title;
     document.getElementById('player-author').innerText = selectedBook.author;
-    
-    document.getElementById('library-view').classList.add('hidden');
-    document.getElementById('player-view').classList.remove('hidden');
-    
-    // Set Blurry Background Image if available
+
+    // Background transition
     const playerBg = document.getElementById('player-bg');
     if (selectedBook.background) {
         playerBg.style.backgroundImage = `url(${selectedBook.background})`;
@@ -101,23 +98,82 @@ window.openPlayer = function(bookId) {
         playerBg.style.backgroundColor = 'black';
     }
 
-    // Handle Admin Edit Button
-    const editBtn = document.getElementById('edit-book-button');
-    if (editBtn) {
-        if (window.isAdmin && selectedBook.edit_url) {
-            editBtn.href = selectedBook.edit_url;
-            editBtn.classList.remove('hidden');
-        } else {
-            editBtn.classList.add('hidden');
-        }
+    // Purchase Lock Logic
+    const desktopLock = document.getElementById('desktop-lock-overlay');
+    const mobileLock = document.getElementById('mobile-lock-overlay');
+    const desktopList = document.getElementById('desktop-chapters-list');
+    const mobileList = document.getElementById('mobile-chapters-list');
+
+    if (selectedBook.is_purchased) {
+        if (desktopLock) desktopLock.classList.add('hidden');
+        if (mobileLock) mobileLock.classList.add('hidden');
+        if (desktopList) desktopList.classList.remove('pointer-events-none', 'opacity-50');
+        if (mobileList) mobileList.classList.remove('pointer-events-none', 'opacity-50');
+    } else {
+        if (desktopLock) desktopLock.classList.remove('hidden');
+        if (mobileLock) mobileLock.classList.remove('hidden');
+        // Keep lists visible but unclickable and slightly dimmed
+        if (desktopList) desktopList.classList.add('pointer-events-none', 'opacity-50');
+        if (mobileList) mobileList.classList.add('pointer-events-none', 'opacity-50');
+
+        // Setup Buy Buttons
+        const buyButtons = [document.getElementById('desktop-buy-btn'), document.getElementById('mobile-buy-btn')];
+        buyButtons.forEach(btn => {
+            if (btn) {
+                const priceTag = btn.querySelector('.price-tag');
+                if (priceTag) priceTag.innerHTML = selectedBook.price_html || '';
+                btn.onclick = (e) => {
+                    e.stopPropagation();
+                    buyAudiobook(selectedBook.product_id);
+                };
+            }
+        });
     }
 
     renderChapters();
     updatePlayerUI();
     
     // Auto-load first chapter URL
-    loadChapterUrl(currentChapter);
+    if (selectedBook.is_purchased) {
+        loadChapterUrl(currentChapter);
+    } else {
+        // Reset player state if locked
+        if (audioPlayer) {
+            audioPlayer.src = '';
+            isPlaying = false;
+            updatePlayIcon();
+        }
+    }
 };
+
+function buyAudiobook(productId) {
+    if (!productId) {
+        alert('Este audiolibro no tiene un producto vinculado.');
+        return;
+    }
+
+    const btn = event.target.closest('button');
+    const originalText = btn.innerHTML;
+    btn.innerHTML = 'AGREGANDO...';
+    btn.disabled = true;
+
+    jQuery.post(voiceqwen_ajax.url, {
+        action: 'vq_woo_add_to_cart',
+        nonce: voiceqwen_ajax.nonce,
+        product_id: productId
+    }, function(response) {
+        if (response.success) {
+            btn.innerHTML = '¡AGREGADO!';
+            setTimeout(() => {
+                window.location.href = response.data.checkout_url;
+            }, 500);
+        } else {
+            alert('Error: ' + response.data);
+            btn.innerHTML = originalText;
+            btn.disabled = false;
+        }
+    });
+}
 
 window.closePlayer = function() {
     document.getElementById('player-view').classList.add('hidden');

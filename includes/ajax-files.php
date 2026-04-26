@@ -261,10 +261,16 @@ function voiceqwen_send_to_audiobook() {
         $playlist = get_post_meta( $book_id, '_vq_playlist', true );
         $playlist = is_array( $playlist ) ? $playlist : ( json_decode( $playlist, true ) ?: [] );
         
+        $duration = '00:00';
+        if (class_exists('\VoiceQwen\Audiobook\AudiobookManager')) {
+            $duration = \VoiceQwen\Audiobook\AudiobookManager::get_wav_duration_formatted($file_path);
+        }
+
         $playlist[] = array(
-            'id'    => uniqid(),
-            'title' => pathinfo( $filename, PATHINFO_FILENAME ),
-            'key'   => $r2_key
+            'id'       => uniqid(),
+            'title'    => pathinfo( $filename, PATHINFO_FILENAME ),
+            'key'      => $r2_key,
+            'duration' => $duration
         );
         
         update_post_meta( $book_id, '_vq_playlist', $playlist );

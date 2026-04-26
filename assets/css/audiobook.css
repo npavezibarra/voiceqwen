@@ -393,22 +393,37 @@
     letter-spacing: -0.5px;
 }
 
+.form-group {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    margin-bottom: 20px;
+}
+
 .form-group label {
     color: #000;
-    font-weight: 700;
+    font-weight: 800;
     text-transform: uppercase;
     font-size: 10px;
-    letter-spacing: 1px;
+    letter-spacing: 2px;
+    width: 100px;
+    flex-shrink: 0;
+    text-align: left;
 }
 
 .form-group input {
+    flex-grow: 1;
     border: 1px solid #eee;
     border-radius: 0;
-    padding: 12px;
+    padding: 14px 18px;
+    font-size: 14px;
+    outline: none;
+    transition: all 0.2s;
 }
 
 .form-group input:focus {
     border-color: #000;
+    background: #fcfcfc;
 }
 
 /* Sidebar button */
@@ -609,4 +624,16 @@
 /* Chapter Edit Button overrides */
 .vq-chapter-actions .vq-chapter-edit {
     font-size: 18px; /* Material Symbol size */
+}
+
+.modal-actions {
+    display: flex;
+    gap: 15px;
+    margin-top: 30px;
+    padding-left: 115px; /* Aligns with the inputs */
+}
+
+.modal-actions button {
+    height: 45px;
+    min-width: 120px;
 }

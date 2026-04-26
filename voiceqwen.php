@@ -20,6 +20,7 @@ require_once plugin_dir_path( __FILE__ ) . 'includes/ajax-markers.php';
 require_once plugin_dir_path( __FILE__ ) . 'includes/class-voiceqwen-audio-analyzer.php';
 require_once plugin_dir_path( __FILE__ ) . 'modules/audiobook/audiobook.php';
 require_once plugin_dir_path( __FILE__ ) . 'modules/audiobook-shop/audiobook-shop.php';
+require_once plugin_dir_path( __FILE__ ) . 'modules/audiobook-woo/audiobook-woo.php';
 
 // 2. Custom Template Loader
 // 2. Custom Template Loader
