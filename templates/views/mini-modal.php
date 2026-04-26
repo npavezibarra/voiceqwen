@@ -37,3 +37,16 @@
         <button id="mini-generate-btn" class="vapor-btn-main mini-btn">GENERATE & INSERT</button>
     </div>
 </div>
+
+<!-- Simple Floating Text Panel (Similar to ADD SPEECH) -->
+<div id="wave-text-panel" class="vapor-window mini-modal hidden" style="width: 450px; height: 550px; position: fixed; top: 100px; right: 50px; z-index: 99999;">
+    <div class="vapor-window-header mini-header">
+        <div class="vapor-dots"><span></span><span></span><span></span></div>
+        <div class="vapor-window-title mini-title">CHAPTER TEXT</div>
+        <button id="wave-text-panel-close" class="mini-close">×</button>
+    </div>
+    <div class="vapor-pane mini-pane" style="height: calc(100% - 40px); display: flex; flex-direction: column; gap: 10px;">
+        <textarea id="wave-text-panel-content" style="flex-grow: 1; width: 100%; padding: 10px; resize: none; font-family: monospace; font-size: 13px;"></textarea>
+        <button id="wave-text-panel-save" class="vapor-btn-main mini-btn" style="background: #000 !important; color: #fff !important; width: 100%;">SAVE CHANGES</button>
+    </div>
+</div>

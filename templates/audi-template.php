@@ -272,6 +272,157 @@
         .view-container .vapor-window-title { color: #000 !important; }
         .view-container .vapor-pane { background: #fff !important; color: #000 !important; }
         .view-container #wave-viewer-empty { border-color: #eee !important; color: #999 !important; background: #fafafa !important; }
+
+        /* Minimalist B&W Mini Modal Overrides */
+        .vq-bw-waveform .mini-modal {
+            background: #fff !important;
+            border: 2px solid #000 !important;
+            box-shadow: 8px 8px 0px rgba(0,0,0,0.15) !important;
+            border-radius: 4px !important;
+            overflow: hidden;
+        }
+        .vq-bw-waveform {
+            display: block !important;
+            visibility: visible !important;
+        }
+        .vq-bw-waveform .mini-header {
+            background: #000 !important;
+            color: #fff !important;
+            border-bottom: 2px solid #000 !important;
+            padding: 8px 12px !important;
+        }
+        .vq-bw-waveform .mini-title {
+            color: #fff !important;
+            font-family: 'Inter', sans-serif !important;
+            font-size: 11px !important;
+            font-weight: 700 !important;
+            letter-spacing: 1px !important;
+            text-transform: uppercase !important;
+        }
+        .vq-bw-waveform .mini-close {
+            color: #fff !important;
+            font-size: 20px !important;
+            opacity: 0.8;
+        }
+        .vq-bw-waveform .mini-pane {
+            background: #fff !important;
+            color: #000 !important;
+            padding: 15px !important;
+        }
+        .vq-bw-waveform .mini-label {
+            color: #000 !important;
+            font-weight: 600 !important;
+            font-size: 10px !important;
+            text-transform: uppercase !important;
+            letter-spacing: 0.5px !important;
+            margin-bottom: 4px !important;
+        }
+        .vq-bw-waveform #mini-text, 
+        .vq-bw-waveform #wave-text-panel-content {
+            background: #fafafa !important;
+            color: #000 !important;
+            border: 1px solid #ddd !important;
+            border-radius: 4px !important;
+            font-family: 'Inter', sans-serif !important;
+            font-size: 13px !important;
+            line-height: 1.5 !important;
+        }
+        .vq-bw-waveform .vapor-btn-main.mini-btn {
+            background: #000 !important;
+            color: #fff !important;
+            border: none !important;
+            border-radius: 4px !important;
+            font-weight: 600 !important;
+            font-size: 12px !important;
+            padding: 10px !important;
+            margin-top: 10px !important;
+            transition: opacity 0.2s;
+        }
+        .vq-bw-waveform .vapor-btn-main.mini-btn:hover {
+            opacity: 0.9;
+        }
+        /* Sliders in B&W */
+        .vq-bw-waveform input[type="range"] {
+            accent-color: #000 !important;
+        }
+
+        /* Generation Overlay in B&W */
+        .vq-bw-waveform .status-overlay-content {
+            background: #fff !important;
+            border: 2px solid #000 !important;
+            box-shadow: 10px 10px 0px rgba(0,0,0,0.2) !important;
+            color: #000 !important;
+            padding: 0 !important;
+            border-radius: 4px !important;
+            overflow: hidden !important;
+        }
+        .vq-bw-waveform .status-overlay-content > div:first-child {
+            background: #000 !important;
+            color: #fff !important;
+            border-bottom: 2px solid #000 !important;
+            padding: 10px 15px !important;
+            font-family: 'Inter', sans-serif !important;
+            text-transform: uppercase !important;
+            letter-spacing: 1px !important;
+        }
+        .vq-bw-waveform .status-overlay-content > div:nth-child(2) {
+            border: none !important;
+            padding: 25px !important;
+            color: #000 !important;
+        }
+        .vq-bw-waveform .status-overlay-content div {
+            color: #000 !important;
+            font-family: 'Inter', sans-serif !important;
+        }
+
+        /* Avatar Radio Styles for Mini Modal */
+        .mini-voice-list {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            padding: 10px 0;
+            margin-bottom: 15px;
+            border-bottom: 1px solid #eee;
+        }
+        .avatar-radio {
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 5px;
+            width: 70px;
+        }
+        .avatar-radio input {
+            display: none;
+        }
+        .avatar-circle {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            border: 2px solid #ddd;
+            background-size: cover;
+            background-position: center;
+            transition: all 0.2s ease;
+        }
+        .avatar-radio input:checked + .avatar-circle {
+            border-color: #000;
+            box-shadow: 0 0 0 3px rgba(0,0,0,0.1);
+            transform: scale(1.1);
+        }
+        .avatar-name {
+            font-size: 10px;
+            font-weight: 600;
+            color: #888;
+            text-align: center;
+            text-transform: uppercase;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            width: 100%;
+        }
+        .avatar-radio input:checked ~ .avatar-name {
+            color: #000;
+        }
     </style>
 </head>
 <body <?php body_class(); ?>>
@@ -352,6 +503,9 @@
             the_content();
         endwhile;
         ?>
+        <div id="voiceqwen-global-status"></div>
+        <button id="reset-status-btn" class="nav-btn hidden" style="background:#ff0000 !important; color:#fff !important; border:none !important; width:100%;">CANCELAR PROCESO</button>
+
     </main>
 </div>
 
@@ -360,6 +514,9 @@
 <script>
 jQuery(document).ready(function($) {
     console.log("Finder UI Initialized");
+    if (window.VoiceQwen && window.VoiceQwen.loadVoices) {
+        window.VoiceQwen.loadVoices();
+    }
 
     // --- Navigation Switcher ---
     $('#nav-audiobook').on('click', function() {

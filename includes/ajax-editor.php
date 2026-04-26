@@ -86,7 +86,8 @@ function voiceqwen_save_edited_audio() {
         }
         wp_send_json_success( array( 'message' => 'Ediciones guardadas correctamente', 'has_backup' => true ) );
     } else {
-        wp_send_json_error( 'Error al guardar las ediciones' );
+        $upload_error = isset($_FILES['audio']['error']) ? $_FILES['audio']['error'] : 'unknown';
+        wp_send_json_error( "Error al guardar las ediciones. Code: {$upload_error}. Path: {$file_path}" );
     }
 }
 add_action( 'wp_ajax_voiceqwen_save_edited_audio', 'voiceqwen_save_edited_audio' );

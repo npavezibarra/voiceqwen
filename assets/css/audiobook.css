@@ -637,3 +637,43 @@
     height: 45px;
     min-width: 120px;
 }
+
+.vq-badge-text {
+    background: #5856d6; /* Purple for text */
+    color: #fff;
+    box-shadow: 0 2px 4px rgba(88,86,214,0.2);
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.vq-badge-text:hover {
+    background: #4a48b3;
+    transform: scale(1.05);
+}
+
+#vq-text-editor-content {
+    background: #fdfdfd;
+    color: #333;
+    line-height: 1.6;
+    border-radius: 4px;
+    outline: none;
+    resize: vertical;
+}
+
+#vq-text-editor-content:focus {
+    border-color: #5856d6;
+    box-shadow: 0 0 0 3px rgba(88,86,214,0.1);
+}
+
+.vq-chapter-actions .vq-chapter-voice:hover {
+    color: #5856d6 !important;
+}
+
+.vq-spin {
+    animation: vq-spin 1.5s linear infinite;
+}
+
+@keyframes vq-spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}

@@ -464,7 +464,12 @@ jQuery(document).ready(function($) {
     }
 
     if (window.lucide) lucide.createIcons();
-    loadBooks();
+    // Initialize only if the shop container exists
+    if (document.getElementById('audiobook-shop-container') || document.getElementById('books-grid')) {
+        if (typeof loadBooks === 'function') {
+            loadBooks();
+        }
+    }
     updateClock();
     setInterval(updateClock, 1000);
 });

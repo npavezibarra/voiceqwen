@@ -124,7 +124,8 @@ jQuery(document).ready(function ($) {
 
     function loadVoices() {
         const $selector = $('#dynamic-voice-selector');
-        if (!$selector.length) return;
+        const $miniSelector = $('#mini-voice-selector');
+        if (!$selector.length && !$miniSelector.length) return;
 
         $.post(voiceqwen_ajax.url, {
             action: 'voiceqwen_get_voices',
@@ -132,18 +133,27 @@ jQuery(document).ready(function ($) {
         }, function(response) {
             if (response.success) {
                 $selector.empty();
+                const $miniSelector = $('#mini-voice-selector');
+                if ($miniSelector.length) $miniSelector.empty();
+
                 const $chips = $('#dialogue-voice-chips');
                 if ($chips.length) $chips.empty();
 
                 response.data.forEach(function(voice, index) {
                     const checked = index === 0 ? 'checked' : '';
-                    $selector.append(`
+                    const radioHtml = `
                         <label class="avatar-radio">
                             <input type="radio" name="voice" value="${voice.id}" ${checked}>
                             <div class="avatar-circle" data-voice="${voice.id}" style="background-image: url('${voice.avatar}');"></div>
                             <span class="avatar-name">${voice.name}</span>
                         </label>
-                    `);
+                    `;
+                    $selector.append(radioHtml);
+                    
+                    const $miniSelector = $('#mini-voice-selector');
+                    if ($miniSelector.length) {
+                        $miniSelector.append(radioHtml);
+                    }
 
                     if ($chips.length) {
                         const $chip = $(`<button type="button" class="nav-btn" style="font-size: 14px; padding: 4px 10px; border-style: dashed; background: #fff; cursor: pointer;">[${voice.name}]</button>`);
@@ -266,9 +276,14 @@ jQuery(document).ready(function ($) {
                 console.log("Generation: Triggering insertion for", currentJobFileUrl);
                 window.VoiceQwen.handleInsertion(currentJobFileUrl);
             }
+            if (currentJobSource === 'chapter' && typeof window.VoiceQwen.handleChapterAudio === 'function') {
+                console.log("Generation: Triggering chapter audio update for", currentJobFileUrl);
+                window.VoiceQwen.handleChapterAudio(currentJobFileUrl);
+            }
             if (typeof window.VoiceQwen.loadFiles === 'function') window.VoiceQwen.loadFiles();
         }
-        $('.nav-btn, #generate-btn').prop('disabled', false);
+        $('.nav-btn, #generate-btn, #mini-generate-btn').prop('disabled', false);
+        $('#mini-generate-btn').text('GENERATE & INSERT'); // Reset text
         
         // Reset state for next job
         setTimeout(() => {

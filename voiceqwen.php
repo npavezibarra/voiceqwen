@@ -70,12 +70,20 @@ function voiceqwen_enqueue_assets() {
     wp_enqueue_script( 'voiceqwen-generation', plugins_url( 'assets/js/generation.js', __FILE__ ), array( 'voiceqwen-core' ), '1.1', true );
     wp_enqueue_script( 'voiceqwen-avatar-manager', plugins_url( 'assets/js/avatar-manager.js', __FILE__ ), array( 'voiceqwen-core' ), '1.1', true );
     wp_enqueue_script( 'voiceqwen-waveform-logic', plugins_url( 'assets/js/waveform-logic.js', __FILE__ ), array( 'jquery' ), '1.1', true );
-    wp_enqueue_script( 'voiceqwen-waveform-ui', plugins_url( 'assets/js/waveform-ui.js', __FILE__ ), array( 'voiceqwen-core', 'wavesurfer', 'voiceqwen-waveform-logic' ), '1.1', true );
+    // Modular Waveform JS
+    wp_enqueue_script( 'voiceqwen-waveform-core', plugins_url( 'assets/js/waveform-core.js', __FILE__ ), array( 'voiceqwen-core', 'wavesurfer', 'voiceqwen-waveform-logic' ), '1.1', true );
+    wp_enqueue_script( 'voiceqwen-waveform-regions', plugins_url( 'assets/js/waveform-regions.js', __FILE__ ), array( 'voiceqwen-waveform-core' ), '1.1', true );
+    wp_enqueue_script( 'voiceqwen-waveform-panels', plugins_url( 'assets/js/waveform-panels.js', __FILE__ ), array( 'voiceqwen-waveform-core' ), '1.1', true );
+    wp_enqueue_script( 'voiceqwen-waveform-ui', plugins_url( 'assets/js/waveform-ui.js', __FILE__ ), array( 'voiceqwen-waveform-panels', 'voiceqwen-waveform-regions' ), '1.1', true );
     wp_enqueue_script( 'voiceqwen-waveform-ruler-controls', plugins_url( 'assets/js/waveform-ruler-controls.js', __FILE__ ), array( 'voiceqwen-waveform-ui' ), '1.1', true );
     wp_enqueue_script( 'voiceqwen-waveform-markers', plugins_url( 'assets/js/waveform-markers.js', __FILE__ ), array( 'voiceqwen-waveform-ui' ), '1.1', true );
     wp_enqueue_script( 'voiceqwen-file-manager', plugins_url( 'assets/js/file-manager.js', __FILE__ ), array( 'voiceqwen-core', 'voiceqwen-waveform-ui' ), '1.1', true );
 
-    wp_enqueue_script( 'voiceqwen-audiobook', plugins_url( 'modules/audiobook/audiobook.js', __FILE__ ), array( 'voiceqwen-core' ), '1.0', true );
+    // Modular Audiobook JS
+    wp_enqueue_script( 'vq-audiobook-ajax', plugins_url( 'modules/audiobook/js/audiobook-ajax.js', __FILE__ ), array( 'jquery' ), '1.1', true );
+    wp_enqueue_script( 'vq-audiobook-ui', plugins_url( 'modules/audiobook/js/audiobook-ui.js', __FILE__ ), array( 'vq-audiobook-ajax' ), '1.1', true );
+    wp_enqueue_script( 'vq-audiobook-player', plugins_url( 'modules/audiobook/js/audiobook-player.js', __FILE__ ), array( 'vq-audiobook-ajax' ), '1.1', true );
+    wp_enqueue_script( 'voiceqwen-audiobook', plugins_url( 'modules/audiobook/js/audiobook-core.js', __FILE__ ), array( 'vq-audiobook-ui', 'vq-audiobook-player' ), '1.1', true );
     wp_enqueue_script( 'voiceqwen-audiobook-author', plugins_url( 'modules/audiobook/audiobook-author.js', __FILE__ ), array( 'voiceqwen-audiobook' ), '1.0', true );
     
     // Shop Assets
@@ -168,6 +176,7 @@ function voiceqwen_ui_shortcode() {
         <?php include plugin_dir_path( __FILE__ ) . 'templates/views/mini-modal.php'; ?>
         
         <div id="voiceqwen-global-status"></div>
+        <button id="reset-status-btn" class="nav-btn hidden" style="background:#ff0000 !important; color:#fff !important; border:none !important; width:100%;">CANCELAR PROCESO</button>
     </div>
     <?php
     return ob_get_clean();
@@ -548,4 +557,17 @@ function voiceqwen_render_settings_page() {
         </form>
     </div>
     <?php
+}
+
+if (isset($_GET['debug_vq_playlist'])) {
+    add_action('init', function() {
+        $books = get_posts(['post_type' => 'audiobook', 's' => 'Momentos Musicales', 'posts_per_page' => 1]);
+        if ($books) {
+            $playlist = get_post_meta($books[0]->ID, '_vq_playlist', true);
+            echo json_encode($playlist, JSON_PRETTY_PRINT);
+        } else {
+            echo "Book not found.";
+        }
+        exit;
+    });
 }

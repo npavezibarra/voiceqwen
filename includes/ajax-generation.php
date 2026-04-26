@@ -55,11 +55,20 @@ function voiceqwen_generate_audio() {
 
     $current_user = wp_get_current_user();
     $username = $current_user->user_login;
+    $upload_dir = wp_upload_dir();
 
-    $text = '';
-    if ( isset( $_POST['text'] ) ) {
-        $text = sanitize_textarea_field( $_POST['text'] );
-    } elseif ( isset( $_FILES['file'] ) ) {
+    $text = isset( $_POST['text'] ) ? sanitize_textarea_field( $_POST['text'] ) : '';
+    
+    if ( empty( $text ) && isset( $_POST['text_key'] ) && !empty($_POST['text_key']) ) {
+        $text_key = sanitize_text_field( $_POST['text_key'] );
+        $path = $upload_dir['basedir'] . '/voiceqwen/' . $username . '/' . $text_key;
+        if ( file_exists( $path ) ) {
+            $text = file_get_contents( $path );
+            $text = sanitize_textarea_field( $text );
+        } else {
+            wp_send_json_error( 'Archivo de texto no encontrado: ' . $text_key );
+        }
+    } elseif ( empty( $text ) && isset( $_FILES['file'] ) ) {
         $file = $_FILES['file'];
         if ( $file['type'] !== 'text/plain' ) {
              wp_send_json_error( 'Formato de archivo no válido. Solo .txt' );
@@ -93,8 +102,13 @@ function voiceqwen_generate_audio() {
         $total_frags = $frag_count + 1;
     }
 
-    $upload_dir = wp_upload_dir();
     $folder = isset( $_POST['folder'] ) ? sanitize_text_field( $_POST['folder'] ) : '';
+    $book_id = isset( $_POST['book_id'] ) ? intval( $_POST['book_id'] ) : 0;
+    
+    if ( empty( $folder ) && $book_id > 0 ) {
+        $folder = get_post_meta( $book_id, '_vq_folder_name', true );
+    }
+
     $user_dir = $upload_dir['basedir'] . '/voiceqwen/' . $username;
     
     if ( ! empty( $folder ) ) {
@@ -111,10 +125,13 @@ function voiceqwen_generate_audio() {
         wp_send_json_error( 'YA HAY UN PROCESO EN CURSO. Por favor espera a que termine.' );
     }
 
-    $audiobook_title = isset( $_POST['audiobook_title'] ) ? sanitize_file_name( $_POST['audiobook_title'] ) : '';
+    $book_title = isset( $_POST['book_title'] ) ? sanitize_file_name( $_POST['book_title'] ) : '';
+    $chapter_title = isset( $_POST['chapter_title'] ) ? sanitize_file_name( $_POST['chapter_title'] ) : '';
     $source = isset( $_POST['source'] ) ? sanitize_text_field( $_POST['source'] ) : '';
     
-    if ( ! empty( $audiobook_title ) ) {
+    if ( ! empty( $book_title ) && ! empty( $chapter_title ) ) {
+        $filename = $book_title . '-' . $chapter_title . '.wav';
+    } elseif ( ! empty( $audiobook_title ) ) {
         $filename = $audiobook_title . '.wav';
     } else {
         $prefix = ($source === 'mini') ? 'clip-' : 'm-';
@@ -124,7 +141,7 @@ function voiceqwen_generate_audio() {
 
     $output_path = $target_dir . '/' . $filename;
     $log_path = $user_dir . '/last_job.log';
-    $python_path = '/Users/nicolas/Local Sites/voiceqwen/app/public/qwet_test/.venv/bin/python3';
+    $python_path = ABSPATH . 'qwet_test/.venv/bin/python3';
     if ( ! file_exists( $python_path ) ) $python_path = 'python3';
     $script_path = plugin_dir_path( dirname( __FILE__ ) ) . 'tts_cli.py';
     $status_file = $user_dir . '/status.json';
@@ -230,7 +247,7 @@ function voiceqwen_generate_dialogue() {
     $filename = 'd-' . sanitize_file_name( $initials ) . '-' . $date_suffix . '.wav';
     $output_path = $user_dir . '/' . $filename;
     $log_path = $user_dir . '/last_job.log';
-    $python_path = '/Users/nicolas/Local Sites/voiceqwen/app/public/qwet_test/.venv/bin/python3';
+    $python_path = ABSPATH . 'qwet_test/.venv/bin/python3';
     if ( ! file_exists( $python_path ) ) $python_path = 'python3';
     $script_path = plugin_dir_path( dirname( __FILE__ ) ) . 'tts_dialogue.py';
     $status_file = $user_dir . '/status.json';

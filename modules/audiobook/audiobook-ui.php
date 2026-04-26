@@ -33,7 +33,7 @@
                     <?php else: ?>
                         <?php foreach ($books as $book): 
                             $author = get_post_meta($book->ID, '_vq_author', true);
-                            $cover_url = \VoiceQwen\Audiobook\AudiobookManager::get_cover_url($book->ID);
+                            $cover_url = \VoiceQwen\Audiobook\AudiobookUtils::get_cover_url($book->ID);
                         ?>
                             <div class="vq-book-item" data-id="<?php echo $book->ID; ?>">
                                 <div class="vq-book-item-thumb">
@@ -81,6 +81,19 @@
                 <div class="modal-actions">
                     <button id="vq-modal-close" class="nav-btn">Cancel</button>
                     <button id="vq-modal-confirm" class="vapor-btn-main">Save</button>
+                </div>
+            </div>
+        </div>
+        <!-- Text Editor Modal -->
+        <div id="vq-text-editor-modal" class="vapor-modal hidden">
+            <div class="vapor-modal-content" style="width: 600px; max-width: 90vw;">
+                <h3 id="vq-text-editor-title">Edit Chapter Text</h3>
+                <div class="form-group" style="display: block;">
+                    <textarea id="vq-text-editor-content" style="width: 100%; height: 300px; font-family: monospace; padding: 15px; border: 1px solid #eee;"></textarea>
+                </div>
+                <div class="modal-actions">
+                    <button id="vq-text-editor-close" class="nav-btn">Cancel</button>
+                    <button id="vq-text-editor-save" class="vapor-btn-main">Save Changes</button>
                 </div>
             </div>
         </div>

@@ -18,6 +18,10 @@ require_once plugin_dir_path(__FILE__) . 'includes/R2Client.php';
 require_once plugin_dir_path(__FILE__) . 'includes/PostTypes.php';
 require_once plugin_dir_path(__FILE__) . 'includes/Settings.php';
 require_once plugin_dir_path(__FILE__) . 'includes/CoverOptimizer.php';
+require_once plugin_dir_path(__FILE__) . 'includes/AudiobookUtils.php';
+require_once plugin_dir_path(__FILE__) . 'includes/AudiobookUI.php';
+require_once plugin_dir_path(__FILE__) . 'includes/AudiobookProcessor.php';
+require_once plugin_dir_path(__FILE__) . 'includes/AudiobookAJAX.php';
 require_once plugin_dir_path(__FILE__) . 'includes/AudiobookManager.php';
 
 // 3. Initialize Module

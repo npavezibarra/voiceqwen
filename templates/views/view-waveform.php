@@ -6,6 +6,14 @@
             <div class="vapor-window-title">WAVEFORM VISUALIZER</div>
         </div>
         <div style="display: flex; gap: 10px; align-items: center;">
+            <button id="wave-open-voice-btn" class="nav-btn hidden" style="width: auto; margin: 0; padding: 2px 12px; font-size: 14px; background: #ff00ff; color: #fff; border: 2px solid #000; display: flex; align-items: center; gap: 5px;" title="Generar voz para este punto o selección">
+                <span class="material-symbols-outlined" style="font-size: 18px;">mic</span>
+                VOICE
+            </button>
+            <button id="wave-view-text-btn" class="nav-btn hidden" style="width: auto; margin: 0; padding: 2px 12px; font-size: 14px; background: #8a2be2; color: #fff; border: 2px solid #000; display: flex; align-items: center; gap: 5px;" title="Ver texto del capítulo">
+                <span class="material-symbols-outlined" style="font-size: 18px;">description</span>
+                TEXT
+            </button>
             <button id="wave-sync-r2" class="nav-btn hidden" style="width: auto; margin: 0; padding: 2px 12px; font-size: 14px; background: #27c93f; color: #fff; border: 2px solid #000; display: flex; align-items: center; gap: 5px;">
                 <span class="material-symbols-outlined" style="font-size: 18px;">cloud_upload</span>
                 UPLOAD
@@ -40,3 +48,5 @@
         </div>
     </div>
 </div>
+
+<!-- Scripts moved to waveform-panels.js -->
