@@ -118,6 +118,7 @@
     position: fixed;
     z-index: 10000001;
     display: flex;
+    flex-direction: column;
     gap: 8px;
     padding: 8px;
     background: rgba(13, 13, 43, 0.98);
@@ -129,15 +130,18 @@
     font-family: inherit;
     font-weight: bold;
     letter-spacing: 1px;
-    font-size: 12px;
-    padding: 6px 10px;
+    font-size: 11px;
+    padding: 8px 16px;
     cursor: pointer;
     border: 2px solid #000;
     background: #0000ff;
     color: #fff;
+    text-align: center;
+    width: 100%;
 }
 .vq-point-btn[data-action="marker"] { background: #ff00ff; }
-.vq-point-btn:hover { transform: translate(-1px, -1px); }
+.vq-point-btn[data-action="silence"] { background: #555; }
+.vq-point-btn:hover { transform: translate(-1px, -1px); filter: brightness(1.2); }
 
 /* Marker layer + marker visuals */
 .vq-markers-layer {

@@ -318,6 +318,7 @@ jQuery(document).ready(function ($) {
         el.innerHTML = ''
             + '<button type="button" class="vq-point-btn" data-action="voice">VOICE</button>'
             + '<button type="button" class="vq-point-btn" data-action="marker">MARKER</button>'
+            + '<button type="button" class="vq-point-btn" data-action="silence">1 SEC SILENCE</button>'
             + '<button type="button" class="vq-point-btn hidden" id="vq-paste-btn" data-action="paste">PASTE</button>';
         document.body.appendChild(el);
     }
@@ -380,6 +381,22 @@ jQuery(document).ready(function ($) {
             hidePointMenu();
             if (window.VoiceQwen && typeof window.VoiceQwen.openAddSpeechAt === 'function') {
                 window.VoiceQwen.openAddSpeechAt(lastPoint.t, lastPoint.clientX, lastPoint.clientY);
+            }
+            return;
+        }
+        if (action === 'silence') {
+            hidePointMenu();
+            if (window.VoiceQwen && window.VoiceQwen.createSilence && window.VoiceQwen.insertAudioAt) {
+                const sampleRate = window.VoiceQwen.activeAudioBuffer ? window.VoiceQwen.activeAudioBuffer.sampleRate : 44100;
+                const numChannels = window.VoiceQwen.activeAudioBuffer ? window.VoiceQwen.activeAudioBuffer.numberOfChannels : 1;
+                const silence = window.VoiceQwen.createSilence(1, sampleRate, numChannels);
+                
+                const newBuf = await window.VoiceQwen.insertAudioAt(window.VoiceQwen.activeAudioBuffer, silence, lastPoint.t);
+                window.VoiceQwen.waveUndoStack.push(window.VoiceQwen.activeAudioBuffer);
+                window.VoiceQwen.activeAudioBuffer = newBuf;
+                if (typeof window.VoiceQwen.updateWaveformPreview === 'function') {
+                    window.VoiceQwen.updateWaveformPreview();
+                }
             }
             return;
         }

@@ -145,4 +145,16 @@ window.VoiceQwen = window.VoiceQwen || {};
         return new Blob([bufferArr], {type: "audio/wav"});
     };
 
+    /**
+     * Creates an AudioBuffer of silence
+     */
+    window.VoiceQwen.createSilence = function(duration, sampleRate, numChannels) {
+        const length = Math.floor(duration * sampleRate);
+        const ctx = window.VoiceQwen.getAudioCtx();
+        if (!ctx) return null;
+        const newBuffer = ctx.createBuffer(numChannels, length, sampleRate);
+        // Buffers created by createBuffer are initialized with silence (zeros)
+        return newBuffer;
+    };
+
 })(jQuery);
