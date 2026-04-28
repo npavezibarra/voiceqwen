@@ -54,9 +54,9 @@ class AudiobookShop {
             // Get Cover & Background URLs using the existing AudiobookManager helpers
             $cover_url = '';
             $background_url = '';
-            if (class_exists('\VoiceQwen\Audiobook\AudiobookManager')) {
-                $cover_url = \VoiceQwen\Audiobook\AudiobookManager::get_cover_url($post->ID);
-                $background_url = \VoiceQwen\Audiobook\AudiobookManager::get_background_url($post->ID);
+            if (class_exists('\VoiceQwen\Audiobook\AudiobookUtils')) {
+                $cover_url = \VoiceQwen\Audiobook\AudiobookUtils::get_cover_url($post->ID);
+                $background_url = \VoiceQwen\Audiobook\AudiobookUtils::get_background_url($post->ID);
             }
 
             // Check for linked WooCommerce product
@@ -122,7 +122,7 @@ class AudiobookShop {
                     
                     $local_path = $user_dir . '/' . $clean_key;
                     if (file_exists($local_path)) {
-                        $duration = \VoiceQwen\Audiobook\AudiobookManager::get_wav_duration_formatted($local_path);
+                        $duration = \VoiceQwen\Audiobook\AudiobookUtils::get_wav_duration_formatted($local_path);
                         if ($duration !== '00:00') {
                             $playlist[$index]['duration'] = $duration;
                             $updated_playlist = true;

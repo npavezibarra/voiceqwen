@@ -43,7 +43,7 @@ class AudiobookAJAX
     public static function vq_upload_chapter(): void {
         check_ajax_referer('voiceqwen_nonce', 'nonce');
         $post_id = intval($_POST['post_id']);
-        $book_title = sanitize_file_name($_POST['book_title']);
+        $book_title = sanitize_file_name($_POST['book_title'] ?? 'book');
         if (empty($_FILES['file'])) wp_send_json_error('No file provided');
 
         $track = AudiobookProcessor::upload_chapter($post_id, $book_title, $_FILES['file']);
@@ -51,6 +51,10 @@ class AudiobookAJAX
             wp_send_json_success($track);
         }
         wp_send_json_error('Upload failed');
+    }
+
+    public static function vq_upload_local_chapter(): void {
+        self::vq_upload_chapter();
     }
 
     public static function vq_get_book_editor(): void {

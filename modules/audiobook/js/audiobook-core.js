@@ -207,28 +207,38 @@ jQuery(document).ready(function($) {
     // Edit in Waveform
     $(document).on('click', '.vq-chapter-edit', function() {
         const btn = $(this);
-        const key = btn.data('key');
+        const key = btn.attr('data-key');
         const card = btn.closest('.vq-card');
         const postId = card.data('id');
-        const textKey = btn.closest('.vq-chapter-item').attr('data-text-key') || btn.closest('.vq-chapter-item').data('text-key');
-        const displayName = btn.closest('.vq-chapter-item').find('.vq-chapter-title').val() || key;
+        const item = btn.closest('.vq-chapter-item');
+        const textKey = item.attr('data-text-key') || item.data('text-key');
+        const displayName = item.find('.vq-chapter-title').val() || key;
 
-        window.VoiceQwen.AJAX.loadEditor(postId, (res) => { // Just a ping to ensure session
-             jQuery.ajax({
-                url: voiceqwen_ajax.url,
-                type: 'POST',
-                data: { action: 'vq_get_track_url', nonce: voiceqwen_ajax.nonce, key: key, storage: 'local', post_id: postId },
-                success: function(response) {
-                    if (response.success) {
-                        const localUrl = response.data;
-                        $('.view-pane, .view-container').removeClass('active').addClass('hidden');
-                        $('#view-waveform').removeClass('hidden').addClass('active').show();
-                        if (window.VoiceQwen.loadWaveform) {
-                            window.VoiceQwen.loadWaveform(localUrl, displayName, false, false, '', key, postId, textKey);
-                        }
+        jQuery.ajax({
+            url: voiceqwen_ajax.url,
+            type: 'POST',
+            data: { 
+                action: 'vq_get_track_url', 
+                nonce: voiceqwen_ajax.nonce, 
+                key: key, 
+                storage: 'local', 
+                post_id: postId 
+            },
+            success: function(response) {
+                if (response.success) {
+                    const localUrl = response.data;
+                    $('.view-pane, .view-container').removeClass('active').addClass('hidden');
+                    $('#view-waveform').removeClass('hidden').addClass('active').show();
+                    if (window.VoiceQwen.loadWaveform) {
+                        window.VoiceQwen.loadWaveform(localUrl, displayName, false, false, '', key, postId, textKey);
                     }
+                } else {
+                    alert('Error getting track URL: ' + (response.data || 'Unknown error'));
                 }
-            });
+            },
+            error: function(xhr, status, error) {
+                alert('AJAX Error: ' + error);
+            }
         });
     });
 
@@ -236,7 +246,7 @@ jQuery(document).ready(function($) {
     $(document).on('click', '.vq-chapter-voice', function(e) {
         const btn = $(this);
         const item = btn.closest('.vq-chapter-item');
-        const textKey = item.attr('data-text-key') || btn.data('text-key');
+        const textKey = item.attr('data-text-key') || item.data('text-key') || btn.data('text-key');
         const bookId = item.closest('.vq-chapters-list').data('id');
         
         const $modal = $('#wave-mini-modal');
@@ -246,7 +256,7 @@ jQuery(document).ready(function($) {
         $modal.find('.mini-title').text('GENERATE CHAPTER AUDIO');
         $modal.find('#mini-generate-btn')
             .data('mode', 'chapter')
-            .data('chapter-id', item.data('id'))
+            .data('chapter-id', item.attr('data-id') || item.data('id'))
             .data('text-key', textKey)
             .data('book-id', bookId)
             .data('book-title', bookTitle)

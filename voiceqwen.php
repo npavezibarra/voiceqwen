@@ -80,7 +80,7 @@ function voiceqwen_enqueue_assets() {
     wp_enqueue_script( 'voiceqwen-file-manager', plugins_url( 'assets/js/file-manager.js', __FILE__ ), array( 'voiceqwen-core', 'voiceqwen-waveform-ui' ), '1.1', true );
 
     // Modular Audiobook JS
-    wp_enqueue_script( 'vq-audiobook-ajax', plugins_url( 'modules/audiobook/js/audiobook-ajax.js', __FILE__ ), array( 'jquery' ), '1.1', true );
+    wp_enqueue_script( 'vq-audiobook-ajax', plugins_url( 'modules/audiobook/js/audiobook-ajax.js', __FILE__ ), array( 'voiceqwen-core' ), '1.1', true );
     wp_enqueue_script( 'vq-audiobook-ui', plugins_url( 'modules/audiobook/js/audiobook-ui.js', __FILE__ ), array( 'vq-audiobook-ajax' ), '1.1', true );
     wp_enqueue_script( 'vq-audiobook-player', plugins_url( 'modules/audiobook/js/audiobook-player.js', __FILE__ ), array( 'vq-audiobook-ajax' ), '1.1', true );
     wp_enqueue_script( 'voiceqwen-audiobook', plugins_url( 'modules/audiobook/js/audiobook-core.js', __FILE__ ), array( 'vq-audiobook-ui', 'vq-audiobook-player' ), '1.1', true );
@@ -557,17 +557,4 @@ function voiceqwen_render_settings_page() {
         </form>
     </div>
     <?php
-}
-
-if (isset($_GET['debug_vq_playlist'])) {
-    add_action('init', function() {
-        $books = get_posts(['post_type' => 'audiobook', 's' => 'Momentos Musicales', 'posts_per_page' => 1]);
-        if ($books) {
-            $playlist = get_post_meta($books[0]->ID, '_vq_playlist', true);
-            echo json_encode($playlist, JSON_PRETTY_PRINT);
-        } else {
-            echo "Book not found.";
-        }
-        exit;
-    });
 }
